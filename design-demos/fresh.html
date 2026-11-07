@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cswap 菜单栏面板 · 清新版</title>
+<style>
+:root{
+  --paper:#F6FAF8; --ink:#17302C; --soft:#526762; --mint:#2FB892; --mint-d:#177659;
+  --sky:#5AA9E6; --apricot:#94520F; --mist:#E3ECE9; --line:rgba(23,48,44,.09);
+  --round: ui-rounded,"SF Pro Rounded","SF Pro Text",-apple-system,"PingFang SC",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--round);color:var(--ink);background:#EDF3F1;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--sky);outline-offset:2px;border-radius:8px}
+
+/* ---------- board ---------- */
+.board{width:1440px;margin:0 auto;padding:0 0 64px}
+.desk{position:relative;height:760px;overflow:hidden;
+  background:
+   radial-gradient(900px 520px at 78% 18%, #D6F0E8 0%, transparent 60%),
+   radial-gradient(800px 600px at 15% 90%, #DCEBFA 0%, transparent 60%),
+   #EEF4F2}
+.menubar{height:30px;display:flex;align-items:center;justify-content:flex-end;gap:18px;padding:0 18px;
+  background:rgba(255,255,255,.55);backdrop-filter:blur(30px) saturate(160%);font-size:13px;color:#1f2a28}
+.menubar .sys{opacity:.75}
+.mb-item{display:flex;align-items:center;gap:5px;padding:3px 7px;border-radius:6px;font-weight:600}
+.mb-item.open{background:rgba(23,48,44,.12)}
+.note{font-size:13px;color:var(--soft);line-height:1.5}
+.note b{color:var(--ink);font-weight:600}
+
+/* ---------- panel ---------- */
+.panel{width:340px;border-radius:16px;background:rgba(246,250,248,.86);backdrop-filter:blur(28px) saturate(170%);
+  box-shadow:0 0 0 .5px rgba(23,48,44,.16),0 18px 50px -12px rgba(23,60,52,.28),0 2px 6px rgba(23,60,52,.06);
+  padding:18px 18px 10px;position:absolute}
+.who{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.who .name{font-size:14px;font-weight:600}
+.who .domain{color:var(--soft);font-weight:500}
+.plan{font-size:12px;font-weight:600;color:var(--soft);border:1px solid var(--line);border-radius:99px;padding:2px 8px;white-space:nowrap}
+.plan.lapsed{color:var(--apricot);border-color:rgba(166,94,27,.35)}
+
+.headline{font-size:21px;line-height:1.35;font-weight:600;letter-spacing:-.01em;margin:12px 0 14px}
+.headline .num{font-size:40px;font-weight:700;letter-spacing:-.03em;color:var(--mint-d);vertical-align:-3px}
+.headline .when{display:block;font-size:17px;font-weight:500;color:var(--soft)}
+
+.track{position:relative;height:10px;border-radius:99px;background:var(--mist)}
+.track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--mint)}
+.track.sky .fill{background:var(--sky)}
+.track .pace{position:absolute;top:-5px;bottom:-5px;width:2px;border-radius:2px;background:var(--ink);opacity:.55}
+.pace-note{font-size:13px;color:var(--apricot);margin:9px 0 0;line-height:1.45}
+.pace-note span{color:var(--soft)}
+
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sub{margin-top:16px}
+.sub .row{font-size:14px;margin-bottom:7px}
+.sub .row .r{color:var(--soft);font-size:13px}
+.track.thin{height:6px}
+
+.sep{height:1px;background:var(--line);margin:16px -18px}
+
+.other .name{font-size:14px;font-weight:600}
+.other .meta{font-size:13px;color:var(--soft);margin-top:3px}
+.mini{display:flex;gap:6px;margin-top:9px}
+.mini .track{flex:1;height:5px}
+.switch-btn{font-size:13px;font-weight:600;color:var(--mint-d);background:rgba(47,184,146,.12);border-radius:99px;padding:6px 12px;white-space:nowrap}
+.switch-btn:hover{background:rgba(47,184,146,.2)}
+.best{font-size:13px;color:var(--soft);margin-top:12px}
+
+.auto .t{font-size:14px;font-weight:600}
+.auto .d{font-size:13px;color:var(--soft);margin-top:3px;line-height:1.45}
+.tog{flex:none;width:38px;height:22px;border-radius:99px;background:#CFDAD7;position:relative;transition:background .2s}
+.tog::after{content:"";position:absolute;left:2px;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .2s}
+.tog[aria-checked=true]{background:var(--mint)}
+.tog[aria-checked=true]::after{transform:translateX(16px)}
+
+.foot{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--soft);margin:14px -8px 0;padding:0 8px}
+.foot .icons{display:flex;gap:2px}
+.ib{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--soft)}
+.ib:hover{background:rgba(23,48,44,.07)}
+
+/* ---------- B variant ---------- */
+.acct{padding:10px 12px;border-radius:12px;margin:0 -12px}
+.acct.cur{background:rgba(47,184,146,.09)}
+.acct .row .name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--mint)}
+.dot.off{background:transparent;box-shadow:inset 0 0 0 1.5px #B9C8C4}
+.acct .big{font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--mint-d)}
+.acct .lanes{display:grid;grid-template-columns:auto 1fr auto;gap:6px 9px;align-items:center;margin-top:9px;font-size:12px;color:var(--soft)}
+.acct .lanes .track{height:5px}
+
+/* ---------- side pieces ---------- */
+.menu{position:absolute;width:236px;border-radius:10px;background:rgba(250,252,251,.92);backdrop-filter:blur(26px);
+  box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 12px 32px -8px rgba(0,0,0,.25);padding:5px;font-size:13px}
+.menu div{padding:5px 10px;border-radius:6px}
+.menu .hl{background:#2A70AE;color:#fff}
+.menu .dim{color:#66766F}
+.menu hr{border:0;height:1px;background:rgba(0,0,0,.08);margin:5px 8px}
+.toast{position:absolute;width:356px;border-radius:18px;background:rgba(250,252,251,.9);backdrop-filter:blur(26px);
+  box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 12px 30px -10px rgba(0,0,0,.25);padding:12px 14px;display:flex;gap:11px}
+.appic{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#E9F8F3,#CBEDE2);display:grid;place-items:center;flex:none}
+.toast .t{font-size:13px;font-weight:600}.toast .b{font-size:13px;color:var(--soft);margin-top:2px;line-height:1.4}
+
+.cap{position:absolute;font-size:14px;color:#4A5F5A;line-height:1.5;width:300px}
+.cap b{display:block;color:var(--ink);font-size:15px;font-weight:600;margin-bottom:2px}
+
+/* settings */
+.set h3{font-size:13px;font-weight:600;color:var(--soft);margin:14px 0 8px}
+.set .head{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600}
+.opt{display:flex;gap:10px;padding:8px 10px;border-radius:10px;margin:0 -10px;font-size:14px;align-items:flex-start}
+.opt .rad{flex:none;width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 1.5px #B9C8C4;margin-top:2px}
+.opt.on{background:rgba(47,184,146,.09)}
+.opt.on .rad{box-shadow:inset 0 0 0 5px var(--mint)}
+.opt small{display:block;font-size:12.5px;color:var(--soft);margin-top:2px;line-height:1.4}
+.slider{position:relative;height:6px;border-radius:99px;background:var(--mist);margin:12px 0 6px}
+.slider i{position:absolute;left:0;top:0;bottom:0;width:80%;border-radius:99px;background:linear-gradient(90deg,var(--mint),var(--apricot))}
+.slider b{position:absolute;left:80%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.2),0 2px 5px rgba(0,0,0,.18)}
+.seg{display:flex;background:var(--mist);border-radius:9px;padding:2px;font-size:13px}
+.seg span{flex:1;text-align:center;padding:5px 0;border-radius:7px;color:#465A56}
+.seg .on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.hist{font-size:13px}
+.hist .row{padding:4px 0;color:var(--soft)}
+.hist .row span:first-child{color:var(--ink)}
+
+/* bar icon states strip */
+.states{position:absolute;display:flex;gap:10px}
+.st{background:rgba(255,255,255,.9);border-radius:8px;padding:6px 10px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600}
+.st small{font-weight:500;color:var(--soft);font-size:12px;margin-left:4px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="glyph" viewBox="0 0 18 14"><rect x="1" y="1.5" width="16" height="4.5" rx="2.25" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2.6" y="3" width="6" height="1.5" rx=".75" fill="currentColor"/><rect x="1" y="8" width="16" height="4.5" rx="2.25" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2.6" y="9.5" width="5.6" height="1.5" rx=".75" fill="currentColor"/></symbol>
+  <symbol id="refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.55M13 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.8v1.6M8 12.6v1.6M14.2 8h-1.6M3.4 8H1.8M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1M12.4 12.4l-1.1-1.1M4.7 4.7 3.6 3.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="back" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="board">
+<div class="desk">
+  <div class="menubar">
+    <span class="sys">英</span><span class="sys">Wi‑Fi</span><span class="sys">100%</span>
+    <span class="mb-item open"><svg width="18" height="14"><use href="#glyph"/></svg>37%</span>
+    <span class="sys">11月7日 周六 06:36</span>
+  </div>
+
+  <!-- ===== A 主面板 ===== -->
+  <section class="panel" style="left:1004px;top:38px" aria-label="主面板 A">
+    <div class="who">
+      <div class="name">alicechen92<span class="domain">@example.com</span></div>
+      <span class="plan lapsed" title="Apple 订阅的 Pro 已取消并到期">Pro 已到期</span>
+    </div>
+
+    <h2 class="headline">本周还剩 <span class="num">37%</span><span class="when">周三早上 5 点回满</span></h2>
+
+    <div class="track" role="img" aria-label="本周剩余 37%，按均速此时应剩 56%">
+      <div class="fill" style="width:37%"></div>
+      <div class="pace" style="left:56%"></div>
+    </div>
+    <p class="pace-note">用得比均速快，这时本该还剩 56%<br><span>照这个速度，大约周一凌晨就会用完</span></p>
+
+    <div class="sub">
+      <div class="row"><span>5 小时额度还剩 71%</span><span class="r">10:10 回满</span></div>
+      <div class="track thin sky"><div class="fill" style="width:71%"></div></div>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="other">
+      <div class="row">
+        <div>
+          <div class="name">BobWilliams8810</div>
+          <div class="meta">本周还剩 36%，周二早上 7 点回满</div>
+        </div>
+        <button class="switch-btn">换过去</button>
+      </div>
+      <div class="mini" aria-hidden="true">
+        <div class="track"><div class="fill" style="width:36%"></div></div>
+        <div class="track sky" style="flex:.45"><div class="fill" style="width:100%"></div></div>
+      </div>
+      <p class="best">你已经在用余量最多的账号</p>
+    </div>
+
+    <div class="sep"></div>
+
+    <div class="auto row">
+      <div><div class="t">自动切换</div><div class="d">用到 90% 时，自动换到余量最多的号</div></div>
+      <button class="tog" role="switch" aria-checked="false" aria-label="自动切换" onclick="this.setAttribute('aria-checked',this.getAttribute('aria-checked')!=='true')"></button>
+    </div>
+
+    <div class="foot">
+      <span>2 个会话在运行，4 分钟前更新</span>
+      <span class="icons">
+        <button class="ib" aria-label="立即刷新"><svg width="16" height="16"><use href="#refresh"/></svg></button>
+        <button class="ib" aria-label="设置"><svg width="16" height="16"><use href="#gear"/></svg></button>
+      </span>
+    </div>
+  </section>
+
+  <!-- 右键菜单 -->
+  <div class="menu" style="left:760px;top:388px" aria-label="账号右键菜单">
+    <div class="hl">换到这个账号</div>
+    <div>设置别名…</div>
+    <div>不参与自动切换</div>
+    <div>单独设置切换线…</div>
+    <hr>
+    <div class="dim">登录有效至 11 月 23 日</div>
+    <hr>
+    <div>移除账号…</div>
+  </div>
+  <p class="cap" style="left:760px;top:600px;width:236px"><b>右键某个账号</b>不常用的操作收在这里，面板保持干净。</p>
+
+  <!-- ===== 设置页 ===== -->
+  <section class="panel set" style="left:404px;top:38px" aria-label="设置">
+    <div class="head"><svg width="16" height="16" style="color:var(--soft)"><use href="#back"/></svg>设置</div>
+
+    <h3>用到多少时换</h3>
+    <div class="row" style="font-size:14px"><span>5 小时或本周任一额度用到</span><b>90%</b></div>
+    <div class="slider"><i></i><b></b></div>
+
+    <h3>换到哪个账号</h3>
+    <div class="opt on"><span class="rad"></span><div>余量最多的<small>默认，最稳</small></div></div>
+    <div class="opt"><span class="rad"></span><div>本周最先回满的<small>先把快作废的额度用掉</small></div></div>
+    <div class="opt"><span class="rad"></span><div>按我排的顺序<small>先用完排前面的账号</small></div></div>
+
+    <h3>菜单栏显示</h3>
+    <div class="seg"><span class="on">本周剩余</span><span>5 小时剩余</span><span>只要图标</span></div>
+
+    <h3>最近切换</h3>
+    <div class="hist">
+      <div class="row"><span>换到 alicechen92</span><span>昨天 09:53</span></div>
+      <div class="row"><span>换到 BobWilliams8810</span><span>昨天 07:50</span></div>
+      <div class="row"><span>换到 alicechen92</span><span>昨天 04:45</span></div>
+    </div>
+    <div class="foot" style="margin-top:10px"><span>添加当前登录的账号</span><span>登录时打开 ✓</span></div>
+  </section>
+  <p class="cap" style="left:94px;top:52px"><b>设置</b>点面板右下角齿轮进入。策略用大白话写：说清"换到哪"，不出现 best、threshold 这类词。<br><br>切换记录是你本机日志里的真实记录。</p>
+
+  <!-- 通知 -->
+  <div class="toast" style="left:40px;top:300px;width:340px">
+    <div class="appic"><svg width="18" height="14" style="color:var(--mint-d)"><use href="#glyph"/></svg></div>
+    <div><div class="t">已换到 BobWilliams8810</div><div class="b">alicechen92 本周用到了 90%</div></div>
+  </div>
+  <p class="cap" style="left:40px;top:380px;width:340px"><b>系统通知（示例）</b>自动切换、两个号都用完、登录快过期时才弹，只说发生了什么。</p>
+
+  <!-- 菜单栏图标状态 -->
+  <div class="states" style="left:404px;top:700px">
+    <span class="st"><svg width="18" height="14"><use href="#glyph"/></svg>37%<small>平时</small></span>
+    <span class="st" style="color:var(--apricot)"><svg width="18" height="14"><use href="#glyph"/></svg>12%<small>快到切换线</small></span>
+    <span class="st"><svg width="18" height="14" style="color:var(--mint-d)"><use href="#glyph"/></svg>37%<small>自动切换开着</small></span>
+    <span class="st" style="color:var(--soft)"><svg width="18" height="14"><use href="#glyph"/></svg>—<small>读不到用量</small></span>
+  </div>
+</div>
+
+<!-- ===== B 并列型 ===== -->
+<div class="desk" style="height:520px;margin-top:28px">
+  <p class="cap" style="left:94px;top:60px;width:420px"><b>另一种排法：两个账号并列</b>不强调"当前账号"，两个号一样大，适合以后账号变多。缺点是少了"还够不够"那句结论，要自己比数字。<br><br>对比右边的 A：A 回答"现在这个号够不够"，B 回答"哪个号还多"。</p>
+
+  <section class="panel" style="left:560px;top:40px" aria-label="主面板 B">
+    <div class="acct cur">
+      <div class="row"><span class="name"><span class="dot"></span>alicechen92</span><span class="big">37%</span></div>
+      <div class="lanes">
+        <span>本周</span><div class="track"><div class="fill" style="width:37%"></div><div class="pace" style="left:56%;top:-3px;bottom:-3px"></div></div><span>周三 05:00</span>
+        <span>5 小时</span><div class="track sky"><div class="fill" style="width:71%"></div></div><span>10:10</span>
+      </div>
+      <p class="pace-note" style="font-size:12.5px;margin-top:8px">用得比均速快</p>
+    </div>
+    <div class="acct" style="margin-top:6px">
+      <div class="row"><span class="name"><span class="dot off"></span>BobWilliams8810</span><span class="big" style="color:var(--ink)">36%</span></div>
+      <div class="lanes">
+        <span>本周</span><div class="track"><div class="fill" style="width:36%"></div></div><span>周二 06:59</span>
+        <span>5 小时</span><div class="track sky"><div class="fill" style="width:100%"></div></div><span>满</span>
+      </div>
+    </div>
+    <div class="sep" style="margin-top:12px"></div>
+    <div class="auto row">
+      <div><div class="t">自动切换</div><div class="d">用到 90% 时换到余量最多的账号</div></div>
+      <button class="tog" role="switch" aria-checked="true" aria-label="自动切换" onclick="this.setAttribute('aria-checked',this.getAttribute('aria-checked')!=='true')"></button>
+    </div>
+    <div class="foot">
+      <span>2 个会话在运行，4 分钟前更新</span>
+      <span class="icons">
+        <button class="ib" aria-label="立即刷新"><svg width="16" height="16"><use href="#refresh"/></svg></button>
+        <button class="ib" aria-label="设置"><svg width="16" height="16"><use href="#gear"/></svg></button>
+      </span>
+    </div>
+  </section>
+</div>
+</div>
+</body>
+</html>

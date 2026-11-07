@@ -1,0 +1,4 @@
+Account priorities (higher first; default 0):
+  Account-1  alicechen92@example.com  0
+  Account-2  BobWilliams8810@example.com  0
+Used only by: cswap auto --strategy priority-consume-first

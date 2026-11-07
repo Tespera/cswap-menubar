@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "active": {
+    "number": 1,
+    "email": "alicechen92@example.com",
+    "organizationName": "alicechen92@example.com's Organization",
+    "organizationUuid": "11111111-2222-4333-8444-555555555555",
+    "isOrganization": true,
+    "managed": true,
+    "usageStatus": "ok",
+    "usage": {
+      "fiveHour": {
+        "pct": 90.0,
+        "resetsAt": "2026-11-07T09:10:00.960992+00:00",
+        "countdown": "2h 13m",
+        "clock": "10:10"
+      },
+      "sevenDay": {
+        "pct": 71.0,
+        "resetsAt": "2026-11-11T04:00:00.961014+00:00",
+        "countdown": "3d 21h",
+        "clock": "Nov 11 05:00",
+        "expectedPct": 44.6,
+        "aheadOfPace": true,
+        "projectedExhaustionAt": "2026-11-08T13:28:31Z",
+        "willLastToReset": false
+      }
+    },
+    "usageFetchedAt": "2026-11-07T06:53:15Z",
+    "usageAgeSeconds": 218.8
+  },
+  "totalManagedAccounts": 2
+}

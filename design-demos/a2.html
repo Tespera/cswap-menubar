@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cswap 菜单栏面板 · A 方案第二版</title>
+<style>
+/* ───────── 展示页外壳 ───────── */
+:root{
+  --paper:#EEF0F2; --ink:#1D1D1F; --ink-2:#55585E; --ink-3:#6E727A; --rule:rgba(20,24,30,.09);
+  --sans:-apple-system,"SF Pro Text","PingFang SC","Helvetica Neue",sans-serif;
+  --tray:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAEsWlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNS41LjAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgeG1sbnM6dGlmZj0iaHR0cDovL25zLmFkb2JlLmNvbS90aWZmLzEuMC8iCiAgICB4bWxuczpleGlmPSJodHRwOi8vbnMuYWRvYmUuY29tL2V4aWYvMS4wLyIKICAgIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIKICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIgogICAgeG1sbnM6c3RFdnQ9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZUV2ZW50IyIKICAgdGlmZjpJbWFnZUxlbmd0aD0iNDgiCiAgIHRpZmY6SW1hZ2VXaWR0aD0iNDgiCiAgIHRpZmY6UmVzb2x1dGlvblVuaXQ9IjIiCiAgIHRpZmY6WFJlc29sdXRpb249IjcyLzEiCiAgIHRpZmY6WVJlc29sdXRpb249IjcyLzEiCiAgIGV4aWY6UGl4ZWxYRGltZW5zaW9uPSI0OCIKICAgZXhpZjpQaXhlbFlEaW1lbnNpb249IjQ4IgogICBleGlmOkNvbG9yU3BhY2U9IjEiCiAgIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiCiAgIHBob3Rvc2hvcDpJQ0NQcm9maWxlPSJzUkdCIElFQzYxOTY2LTIuMSIKICAgeG1wOk1vZGlmeURhdGU9IjIwMjQtMTAt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");
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;background:var(--paper)}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+.shell{max-width:1180px;margin:0 auto;padding:44px 40px 80px}
+h1{font:700 26px/1.25 var(--sans);letter-spacing:-.01em}
+.lede{max-width:780px;font-size:14px;line-height:1.75;color:var(--ink-2);margin-top:10px}
+.controls{position:sticky;top:0;z-index:50;margin:24px -40px 0;padding:11px 40px;background:rgba(238,240,242,.9);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;gap:22px;flex-wrap:wrap;align-items:center}
+.ctl{display:flex;align-items:center;gap:9px}
+.ctl>span{font:600 12px var(--sans);color:var(--ink-3)}
+.pick{display:inline-flex;background:#E2E5E9;border:1px solid var(--rule);border-radius:8px;padding:2px}
+.pick button{font:500 13px var(--sans);color:var(--ink-2);padding:6px 11px;border-radius:6px;white-space:nowrap}
+.pick button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.pick button:focus-visible{outline:2px solid #0A84FF;outline-offset:1px}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:24px}
+.cap{font:600 12px var(--sans);color:var(--ink-3);margin-bottom:9px}
+.stage{position:relative;border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,.16);box-shadow:0 30px 60px -32px rgba(20,30,50,.45);height:640px;transition:height .2s}
+.wall{position:absolute;inset:0;background:radial-gradient(120% 80% at 8% 0%,#C9DDF2 0%,transparent 55%),radial-gradient(90% 70% at 100% 35%,#E7D3C6 0%,transparent 60%),radial-gradient(80% 60% at 25% 100%,#CFE3D8 0%,transparent 60%),#D5D9E0}
+.dark .wall{background:radial-gradient(120% 80% at 8% 0%,#22344F 0%,transparent 55%),radial-gradient(90% 70% at 100% 35%,#3F2C2A 0%,transparent 60%),radial-gradient(80% 60% at 25% 100%,#1D3A33 0%,transparent 60%),#15171C}
+.why{margin-top:34px;display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.why div{font-size:13.5px;line-height:1.7;color:var(--ink-2)}
+.why b{display:block;color:var(--ink);font-size:14px;margin-bottom:4px}
+
+/* ───────── 菜单栏 ───────── */
+.menubar{position:absolute;top:0;left:0;right:0;height:24px;display:flex;align-items:center;justify-content:flex-end;gap:2px;padding:0 10px;
+  background:rgba(246,246,246,.62);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);
+  color:#111;font:500 13px var(--sans);--fg:#111}
+.dark .menubar{background:rgba(28,28,30,.5);color:#F2F2F2;--fg:#F2F2F2}
+.mb{height:22px;display:flex;align-items:center;padding:0 7px;border-radius:5px;white-space:nowrap;opacity:.92}
+.mb.cs{gap:4px}
+.mb.cs.active{background:rgba(0,0,0,.12)}
+.dark .mb.cs.active{background:rgba(255,255,255,.18)}
+.tray{width:16px;height:16px;background:var(--fg);-webkit-mask:var(--tray) center/contain no-repeat;mask:var(--tray) center/contain no-repeat;flex:none}
+.mbpct{font:500 12px var(--sans);font-variant-numeric:tabular-nums}
+.mb.cs.warn .mbpct{color:#C46F00}.dark .mb.cs.warn .mbpct{color:#FFB340}
+.mb.cs.bad .mbpct{color:#D3271C}.dark .mb.cs.bad .mbpct{color:#FF6961}
+
+/* ───────── 面板 ───────── */
+.panel{position:absolute;top:30px;right:10px;width:320px;border-radius:12px;overflow:hidden;
+  background:rgba(244,244,246,.80);backdrop-filter:blur(40px) saturate(190%);-webkit-backdrop-filter:blur(40px) saturate(190%);
+  box-shadow:0 0 0 .5px rgba(0,0,0,.22),0 18px 50px -10px rgba(0,0,0,.35),inset 0 0 0 .5px rgba(255,255,255,.55);
+  color:#1d1d1f;font:12px/1.35 var(--sans);
+  --t2:rgba(0,0,0,.58);--t3:rgba(0,0,0,.45);--sep:rgba(0,0,0,.085);--hover:rgba(0,0,0,.05);--card:rgba(255,255,255,.6);--accent:#0A84FF;
+  --ok:#2FB350;--warn:#C46F00;--bad:#D3271C;--off:rgba(0,0,0,.3);--track:rgba(0,0,0,.075)}
+.dark .panel{background:rgba(38,38,42,.78);color:#F2F2F7;box-shadow:0 0 0 .5px rgba(0,0,0,.6),0 18px 50px -10px rgba(0,0,0,.6),inset 0 0 0 .5px rgba(255,255,255,.12);
+  --t2:rgba(255,255,255,.64);--t3:rgba(255,255,255,.48);--sep:rgba(255,255,255,.085);--hover:rgba(255,255,255,.07);--card:rgba(255,255,255,.06);
+  --ok:#32D74B;--warn:#FFB340;--bad:#FF6961;--off:rgba(255,255,255,.32);--track:rgba(255,255,255,.1)}
+.cardbg{background:var(--card);box-shadow:0 0 0 .5px var(--sep)}
+.hair{height:.5px;background:var(--sep);margin:0 12px}
+
+/* 头像：两种 */
+.av{flex:none;display:grid;place-items:center}
+.av svg{display:block;width:100%;height:100%}
+.av.claude{border-radius:28%;overflow:hidden;box-shadow:0 0 0 .5px rgba(0,0,0,.12)}
+.av.claude.idle{filter:grayscale(1);opacity:.42}
+.av.letter{border-radius:50%;font:600 10px var(--sans)}
+
+/* 头部 */
+.hd{padding:12px 14px 9px;display:flex;align-items:center;gap:8px}
+.hd .av{width:22px;height:22px}
+.hd .av.letter{font-size:11px}
+.hd .nm{font:600 13px var(--sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tag{font:600 9.5px var(--sans);padding:1.5px 5px;border-radius:4px;color:var(--t2);background:var(--card);box-shadow:0 0 0 .5px var(--sep);white-space:nowrap;flex:none}
+.tag.w{color:var(--warn)}
+.st{margin-left:auto;display:flex;align-items:center;gap:4px;font:600 10.5px var(--sans);white-space:nowrap}
+.st i{width:6px;height:6px;border-radius:50%;display:block}
+.c-ok{color:var(--ok)}.c-warn{color:var(--warn)}.c-bad{color:var(--bad)}
+.b-ok{background:var(--ok)}.b-warn{background:var(--warn)}.b-bad{background:var(--bad)}
+
+/* 用量卡 */
+.duo2{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 10px}
+.uc{border-radius:9px;padding:7px 9px 7px}
+.uc .top{display:flex;justify-content:space-between;align-items:baseline}
+.lab{font:600 10px var(--sans);color:var(--t3)}
+.val{font:600 12.5px var(--sans);font-variant-numeric:tabular-nums}
+.val small{font:500 9.5px var(--sans);color:var(--t2);margin-left:1px}
+.bar{position:relative;height:5px;border-radius:3px;background:var(--track);margin-top:7px}
+.bar>i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.bar>u{position:absolute;top:-3px;bottom:-3px;width:1.5px;border-radius:1px;background:var(--t2)}
+.uc .foot{font:500 9.5px var(--sans);color:var(--t2);margin-top:6px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.note{font:500 10.5px/1.45 var(--sans);color:var(--t2);padding:7px 14px 2px}
+
+/* 账号列表：像系统 Wi‑Fi 菜单那样，当前那个图标点亮 */
+.sh{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 4px;font:600 10.5px var(--sans);color:var(--t3)}
+.sh button{display:flex;align-items:center;gap:3px;color:var(--t2);font:500 10.5px var(--sans);padding:1px 4px;border-radius:5px}
+.sh button:hover{background:var(--hover)}
+.acc{display:flex;align-items:center;gap:9px;padding:6px 10px;margin:0 4px;border-radius:8px}
+.acc:hover{background:var(--hover)}
+.acc .av{width:26px;height:26px}
+.acc .grow{flex:1;min-width:0}
+.acc .an{display:flex;align-items:center;gap:6px;font:500 12px var(--sans)}
+.acc .an span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.acc .am{display:flex;gap:12px;margin-top:3px;font:500 10px var(--sans);color:var(--t2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mm{display:flex;align-items:center;gap:5px}
+.mm .bar{width:30px;height:3px;margin:0}
+.acc .cur{font:600 10.5px var(--sans);color:var(--accent);flex:none;display:flex;align-items:center;gap:3px}
+.btn{flex:none;font:500 11px var(--sans);padding:3px 10px;border-radius:6px;background:var(--card);box-shadow:0 0 0 .5px var(--sep),0 .5px 1px rgba(0,0,0,.06)}
+.btn:hover{background:var(--hover)}
+.btn:focus-visible,.sh button:focus-visible,.ib:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+/* 行与开关 */
+.row{display:flex;align-items:center;gap:9px;padding:7px 10px;margin:2px 4px;border-radius:7px}
+.row .ic{width:18px;display:grid;place-items:center;flex:none;color:var(--t2)}
+.row .grow{flex:1;min-width:0}
+.row .title{font-weight:500;font-size:12px}
+.row .sub{font-size:10.5px;color:var(--t2);margin-top:1px}
+.sw{width:26px;height:15px;border-radius:99px;background:var(--off);position:relative;flex:none;transition:background .15s}
+.sw::after{content:"";position:absolute;top:1.5px;left:1.5px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 .5px 1px rgba(0,0,0,.25);transition:left .15s}
+.sw.on{background:var(--accent)}.sw.on::after{left:12.5px}
+.alert{display:flex;gap:7px;align-items:flex-start;margin:4px 10px 2px;padding:7px 9px;border-radius:8px;font:500 10.5px/1.45 var(--sans);color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+
+/* 工具栏 */
+.tb{display:flex;align-items:center;gap:4px;padding:6px 8px;border-top:.5px solid var(--sep);margin-top:6px}
+.ib{width:26px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--t2)}
+.ib:hover{background:var(--hover)}
+.tb .meta{font:500 10px var(--sans);color:var(--t3);margin:0 auto 0 4px;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:900px){.duo,.why{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs><linearGradient id="cbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E97A56"/><stop offset="1" stop-color="#EC6B41"/></linearGradient></defs>
+  <symbol id="claude" viewBox="0 0 2048 2048"><rect width="2048" height="2048" fill="url(#cbg)"/><path transform="translate(276.4 276.4) scale(62.3)" fill="#fff" d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.55M13 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.1" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.8v1.7M8 12.5v1.7M14.2 8h-1.7M3.5 8H1.8M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2M12.4 12.4l-1.2-1.2M4.8 4.8 3.6 3.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-auto" viewBox="0 0 16 16"><path d="M3 5.5h9.5L10 3M13 10.5H3.5L6 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2.2 14.3 13H1.7z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6.5v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.2" r=".8" fill="currentColor"/></symbol>
+</svg>
+
+<div class="shell">
+  <h1>cswap 菜单栏面板 · A 方案第二版</h1>
+  <p class="lede">在 A 的基础上改：数字一律是已用量，"回满"改成"刷新"；加了账号列表；面板里只留每天会用到的东西。「现在」是你两个账号此刻的真实数据，其余场景是示例，用来看不同状态下面板怎么变。头像可以在上面切换两种做法对比。</p>
+
+  <div class="controls">
+    <div class="ctl"><span>场景</span><div class="pick" id="ps"></div></div>
+    <div class="ctl"><span>头像</span><div class="pick" id="pa"></div></div>
+  </div>
+
+  <div class="duo">
+    <div><div class="cap">浅色菜单栏</div><div class="stage" id="sl"></div></div>
+    <div class="dark"><div class="cap">深色菜单栏</div><div class="stage" id="sd"></div></div>
+  </div>
+
+  <div class="why">
+    <div><b>账号列表参考系统 Wi‑Fi 菜单</b>每个账号一行：名字、套餐、5 小时和本周两根细条。正在用的那个图标点亮，右边标"使用中"；其他账号图标变灰，右边一个"切换"按钮。和 B 的表格不同，它不用表头，也不用整行蓝底。</div>
+    <div><b>拿掉的东西</b>顶部数据条（刷新时间已经在卡片里）、运行中的会话列表（换号时不需要看它）、底部的添加按钮（挪到账号列表右上角，和列表放在一起）。登录有效期平时不显示，剩不到 7 天才出一条提醒。</div>
+    <div><b>按场景加的东西</b>用得比均速快时，卡片下多一句节奏提示；自动切换打开且快到线时，开关下面直接写出接下来会换到哪个号；某个号的登录快过期时出一条提醒。正常时这些都不出现。</div>
+  </div>
+</div>
+
+<script>
+const LT=['#E0784F','#4F7FE0'];
+/* used = 已用百分比。now 为 2026-11-07 06:36 真实读数，其余为示例 */
+const S={
+ now:{label:'现在（真实）',auto:false,upd:'4 分钟前更新',accts:[
+   {name:'alicechen92',plan:'Pro 已到期',planW:true,cur:true,h5:{used:29,in:'3 时 33 分'},wk:{used:63,reset:'周三 05:00',ideal:44,fast:true,proj:'周一凌晨'}},
+   {name:'BobWilliams8810',plan:'Free',h5:{used:0},wk:{used:64,reset:'周二 06:59',ideal:57}}],login:null},
+ near:{label:'快到切换线',auto:true,upd:'刚刚更新',accts:[
+   {name:'alicechen92',plan:'Pro',cur:true,h5:{used:87,in:'1 时 05 分'},wk:{used:78,reset:'周三 05:00',ideal:52,fast:true,proj:'周日晚上'}},
+   {name:'BobWilliams8810',plan:'Pro',h5:{used:0},wk:{used:59,reset:'周二 06:59',ideal:57}}],login:null},
+ out:{label:'两个号都用完',auto:true,upd:'1 分钟前更新',accts:[
+   {name:'alicechen92',plan:'Pro',cur:true,h5:{used:100,in:'52 分'},wk:{used:82,reset:'周三 05:00',ideal:60,fast:true}},
+   {name:'BobWilliams8810',plan:'Pro',h5:{used:54,in:'3 时 04 分'},wk:{used:100,reset:'周二 06:59',ideal:70}}],login:null},
+ stale:{label:'读不到用量',auto:false,upd:'读取失败，2 分钟后重试',accts:[
+   {name:'alicechen92',plan:'Pro',cur:true,h5:{used:29,in:'3 时 33 分'},wk:{used:40,reset:'周三 05:00',ideal:44}},
+   {name:'BobWilliams8810',plan:'Free',na:true,h5:{used:null},wk:{used:null}}],login:{name:'BobWilliams8810',date:'11 月 9 日',days:2}}
+};
+const tight=a=>Math.max(a.h5.used??0,a.wk.used??0);
+function verdict(sc){
+  const a=sc.accts.find(x=>x.cur), others=sc.accts.filter(x=>!x.cur&&!x.na);
+  const t=tight(a);
+  if(t>=100) return others.some(o=>tight(o)<100)?{lv:'bad',t:'已用完'}:{lv:'bad',t:'都已用完'};
+  if(t>=85) return {lv:'warn',t:'快到切换线'};
+  if(a.wk.fast) return {lv:'warn',t:'用得偏快'};
+  return {lv:'ok',t:'充足'};
+}
+const fc=(u,base)=>u>=100?'var(--bad)':u>=85?'var(--warn)':base;
+const bar=(u,base,ideal)=>`<div class="bar"><i style="width:${u??0}%;background:${fc(u??0,base)}"></i>${ideal!=null?`<u style="left:${ideal}%"></u>`:''}</div>`;
+const ico=(id,s=15)=>`<svg width="${s}" height="${s}"><use href="#${id}"/></svg>`;
+let av='claude', cs='now';
+function avatar(a,i,active){
+  if(av==='claude') return `<span class="av claude ${active?'':'idle'}">${'<svg viewBox="0 0 2048 2048"><use href="#claude"/></svg>'}</span>`;
+  const c=LT[i];
+  return `<span class="av letter" style="background:color-mix(in srgb,${c} ${active?18:10}%,transparent);color:${c};${active?`box-shadow:0 0 0 1px color-mix(in srgb,${c} 45%,transparent)`:''}">${a.name[0].toUpperCase()}</span>`;
+}
+function panel(sc){
+  const a=sc.accts.find(x=>x.cur), ai=sc.accts.indexOf(a), v=verdict(sc);
+  const others=sc.accts.filter(x=>!x.cur&&!x.na), best=others.sort((x,y)=>tight(x)-tight(y))[0];
+  let h=`<div class="hd">${avatar(a,ai,true)}<span class="nm">${a.name}</span><span class="tag ${a.planW?'w':''}">${a.plan}</span><span class="st c-${v.lv}"><i class="b-${v.lv}"></i>${v.t}</span></div>`;
+  h+=`<div class="duo2">
+   <div class="uc cardbg"><div class="top"><span class="lab">5 小时</span><span class="val">${a.h5.used}<small>%</small></span></div>${bar(a.h5.used,'var(--accent)')}<div class="foot">${a.h5.in}后刷新</div></div>
+   <div class="uc cardbg"><div class="top"><span class="lab">本周</span><span class="val">${a.wk.used}<small>%</small></span></div>${bar(a.wk.used,'var(--ok)',a.wk.ideal)}<div class="foot">${a.wk.reset} 刷新</div></div></div>`;
+  if(a.h5.used>=100) h+=`<div class="note">5 小时额度用完了，${a.h5.in}后刷新</div>`;
+  else if(a.wk.fast) h+=`<div class="note">本周用得比均速快（竖线是均速）${a.wk.proj?`，照这样${a.wk.proj}用完`:''}</div>`;
+  h+=`<div class="sh"><span>账号</span><button aria-label="添加当前登录的账号">${ico('i-plus',11)}添加</button></div>`;
+  h+=sc.accts.map((x,i)=>{
+    const meta=x.na?`<span>读不到用量，最后一次是 2 小时前</span>`:
+      `<span class="mm">${bar(x.h5.used,'var(--accent)')}5 小时 ${x.h5.used}%</span><span class="mm">${bar(x.wk.used,'var(--ok)')}本周 ${x.wk.used}%</span>`;
+    const right=x.cur?`<span class="cur">${ico('i-check',11)}使用中</span>`:`<button class="btn">切换</button>`;
+    return `<div class="acc">${avatar(x,i,x.cur)}<div class="grow"><div class="an"><span>${x.name}</span><span class="tag ${x.planW?'w':''}">${x.plan}</span></div><div class="am">${meta}</div></div>${right}</div>`;
+  }).join('');
+  if(sc.login) h+=`<div class="alert">${ico('i-warn',13)}<span>${sc.login.name} 的登录 ${sc.login.date}过期，还剩 ${sc.login.days} 天。到期前用这个号在 Claude Code 里重新登录一次。</span></div>`;
+  h+=`<div class="hair" style="margin-top:6px"></div>`;
+  let sub=sc.auto?'用到 90% 时换到余量最多的号':'已关闭';
+  if(sc.auto&&tight(a)>=85&&tight(a)<100&&best&&tight(best)<85) sub=`快到 90% 了，到线就换到 ${best.name}`;
+  if(sc.auto&&v.t==='都已用完') sub='没有可换的号，等最先刷新的那个';
+  h+=`<div class="row"><span class="ic">${ico('i-auto')}</span><div class="grow"><div class="title">自动切换</div><div class="sub">${sub}</div></div><span class="sw ${sc.auto?'on':''}" role="switch" aria-checked="${sc.auto}" tabindex="0"></span></div>`;
+  h+=`<div class="tb"><button class="ib" aria-label="立即刷新">${ico('i-refresh')}</button><span class="meta">${sc.upd}</span><button class="ib" aria-label="设置">${ico('i-gear')}</button></div>`;
+  return h;
+}
+function render(){
+  const sc=S[cs], a=sc.accts.find(x=>x.cur), v=verdict(sc);
+  for(const id of ['sl','sd']){
+    const st=document.getElementById(id);
+    st.innerHTML=`<div class="wall"></div>
+    <div class="menubar"><span class="mb"><svg width="15" height="11" viewBox="0 0 15 11"><path d="M7.5 10.2 5.6 8.1a2.7 2.7 0 0 1 3.8 0zM3.8 6.3a5.3 5.3 0 0 1 7.4 0l-1 1.1a3.9 3.9 0 0 0-5.4 0zM1.9 4.4a8 8 0 0 1 11.2 0l-1 1a6.6 6.6 0 0 0-9.2 0zM0 2.5a10.7 10.7 0 0 1 15 0l-1 1a9.3 9.3 0 0 0-13 0z" fill="currentColor"/></svg></span>
+    <span class="mb cs active ${v.lv==='ok'?'':v.lv}"><span class="tray"></span><span class="mbpct">${tight(a)}%</span></span>
+    <span class="mb">11月7日 周六 06:36</span></div>
+    <div class="panel">${panel(sc)}</div>`;
+    st.style.height=(st.querySelector('.panel').offsetHeight+70)+'px';
+  }
+  document.querySelectorAll('#ps button').forEach(b=>b.classList.toggle('on',b.dataset.k===cs));
+  document.querySelectorAll('#pa button').forEach(b=>b.classList.toggle('on',b.dataset.k===av));
+}
+document.getElementById('ps').innerHTML=Object.entries(S).map(([k,v])=>`<button data-k="${k}">${v.label}</button>`).join('');
+document.getElementById('pa').innerHTML=[['claude','Claude 图标'],['letter','字母']].map(([k,l])=>`<button data-k="${k}">${l}</button>`).join('');
+document.getElementById('ps').onclick=e=>{const k=e.target.dataset.k;if(k){cs=k;render()}};
+document.getElementById('pa').onclick=e=>{const k=e.target.dataset.k;if(k){av=k;render()}};
+document.addEventListener('click',e=>{if(e.target.classList.contains('sw')){const sc=S[cs];sc.auto=!sc.auto;render()}});
+const q=new URLSearchParams(location.search); if(q.get('s'))cs=q.get('s'); if(q.get('a'))av=q.get('a');
+render();
+</script>
+</body>
+</html>
