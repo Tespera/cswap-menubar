@@ -6,19 +6,36 @@ import Testing
 struct VerdictTests {
     @Test func fixtureIsNearThreshold() throws {
         // 真实数据：当前账号 5 小时 90%
-        let v = OverviewBuilder.verdict(list: try Fixture.list())
+        let v = OverviewBuilder.verdict(list: try Fixture.list(), now: fixtureNow)
         #expect(v == Verdict(level: .warn, text: "快到切换阈值"))
     }
 
     @Test func rules() {
-        #expect(OverviewBuilder.verdict(list: list(account(1, active: true, five: 20, week: 30))).text == "充足")
-        #expect(OverviewBuilder.verdict(list: list(account(1, active: true, five: 20, week: 30, ahead: true))).text == "用得偏快")
-        #expect(OverviewBuilder.verdict(list: list(account(1, active: true, five: 85, week: 30))).level == .warn)
-        #expect(OverviewBuilder.verdict(list: list(account(1, active: true, five: 100, week: 30), account(2, five: 10))).text == "已用完")
-        #expect(OverviewBuilder.verdict(list: list(account(1, active: true, five: 100), account(2, five: 30, week: 100))).text == "都已用完")
-        #expect(OverviewBuilder.verdict(list: list(account(1, active: true, status: .tokenExpired))) == Verdict(level: .bad, text: "登录已失效"))
-        #expect(OverviewBuilder.verdict(list: list(account(1, active: true, five: nil, week: nil))).level == .off)
-        #expect(OverviewBuilder.verdict(list: nil).level == .off)
+        func v(_ l: AccountList?) -> Verdict { OverviewBuilder.verdict(list: l, now: fixtureNow) }
+        #expect(v(list(account(1, active: true, five: 20, week: 30))).text == "充足")
+        // 按当前速度撑不到刷新（刷新在 3 天后、2 天后用完）→ 偏快，不管有没有超过均速 15 个点
+        #expect(v(list(account(1, active: true, five: 20, week: 30, exhaustIn: 2 * 86400))).text == "用得偏快")
+        // 只有 cswap 的 aheadOfPace、能撑到刷新 → 充足
+        #expect(v(list(account(1, active: true, five: 20, week: 30, ahead: true))).text == "充足")
+        // 预计用完在刷新之后 → 充足
+        #expect(v(list(account(1, active: true, five: 20, week: 30, exhaustIn: 4 * 86400))).text == "充足")
+        // 刷新后头 24 小时外推不可信 → 不判
+        #expect(v(list(account(1, active: true, five: 20, week: 5, exhaustIn: 3600, weekReset: fixtureNow.addingTimeInterval(6.5 * 86400)))).text == "充足")
+        #expect(v(list(account(1, active: true, five: 85, week: 30))).level == .warn)
+        #expect(v(list(account(1, active: true, five: 100, week: 30), account(2, five: 10))).text == "已用完")
+        #expect(v(list(account(1, active: true, five: 100), account(2, five: 30, week: 100))).text == "都已用完")
+        #expect(v(list(account(1, active: true, status: .tokenExpired))) == Verdict(level: .bad, text: "登录已失效"))
+        #expect(v(list(account(1, active: true, five: nil, week: nil))).level == .off)
+        #expect(v(nil).level == .off)
+    }
+
+    @Test func exhaustionLine() {
+        let far = OverviewBuilder.cards(for: account(1, active: true, exhaustIn: 2 * 86400), now: fixtureNow)
+        #expect(far[1].exhaustion?.hasPrefix("预计周") == true && far[1].exhaustion?.hasSuffix(" 用完") == true)
+        let near = OverviewBuilder.cards(for: account(1, active: true, exhaustIn: 5 * 3600 + 20 * 60), now: fixtureNow)
+        #expect(near[1].exhaustion == "预计 5 时 20 分后用完")
+        #expect(OverviewBuilder.cards(for: account(1, active: true), now: fixtureNow)[1].exhaustion == nil)
+        #expect(far[0].exhaustion == nil)
     }
 
     @Test func barTint() {
@@ -68,7 +85,7 @@ struct OverviewTests {
         #expect(o.cards[0].tint == .warn)
         #expect(o.cards[0].foot == "2 时 14 分后刷新")
         #expect(o.cards[1].pace == 44.6)
-        #expect(o.paceNote?.hasPrefix("本周用得比均速快（竖线是均速），照这样") == true)
+        #expect(o.cards[1].exhaustion?.hasSuffix("用完") == true)
         #expect(o.rows.count == 2)
         #expect(o.rows[0].isCurrent && o.rows[0].action == nil && o.rows[0].avatar == .color)
         #expect(o.rows[1].action == .switchTo && o.rows[1].avatar == .idle)

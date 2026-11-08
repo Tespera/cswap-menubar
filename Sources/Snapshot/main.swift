@@ -102,6 +102,14 @@ let scenarios: [Scenario] = [
     },
     .init(name: "12-auto") { .preview(list: realList, config: customConfig, autoSwitch: .running, pages: [.autoSwitch], now: now) },
     .init(name: "13-settings") { .preview(list: realList, pages: [.settings], latest: "0.31.0", now: now) },
+    .init(name: "13b-settings-upgrade-pinned") {
+        .preview(list: realList, pages: [.settings], latest: "1.0.0",
+                 versionNote: .upgrade(.pinned(current: "0.30.0", latest: "1.0.0")), now: now)
+    },
+    .init(name: "13c-settings-upgraded") {
+        .preview(list: realList, pages: [.settings], version: "1.0.0", latest: "1.0.0",
+                 versionNote: .upgrade(.upgraded(from: "0.30.0", to: "1.0.0")), now: now)
+    },
     .init(name: "14-history") { .preview(list: realList, pages: [.history], history: history, now: now) },
 ]
 

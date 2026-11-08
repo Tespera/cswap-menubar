@@ -29,12 +29,6 @@ struct MainPage: View {
             .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 9)
         }
         if !o.cards.isEmpty { UsageCards(cards: o.cards) }
-        if let note = o.paceNote {
-            Text(note).font(F.sys(10.5, .medium)).foregroundStyle(T.t2).lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14).padding(.top, 7).padding(.bottom, 2)
-        }
         if let v = model.cswapVersion, CswapVersion.isOlder(v, than: CswapVersion.minimum) {
             AlertBox(text: "cswap \(v) 太旧，部分信息可能显示不全，建议升级到 \(CswapVersion.minimum) 以上") {
                 Button("升级") { model.upgrade() }.buttonStyle(SmallButtonStyle()).disabled(model.upgrading)
@@ -76,9 +70,9 @@ struct AutoSwitchRow: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            Image(systemName: "arrow.left.arrow.right").font(.system(size: 12, weight: .medium)).foregroundStyle(T.t2)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 1) {
+            Image(systemName: "arrow.left.arrow.right").font(.system(size: 13, weight: .medium)).foregroundStyle(T.t2)
+                .frame(width: RowMetrics.leading)
+            VStack(alignment: .leading, spacing: 4) {
                 Text("自动切换").font(F.sys(12, .medium))
                 Text(row.subtitle).font(F.sys(10.5)).lineLimit(2)
                     .foregroundStyle(row.level == .warn || row.level == .bad ? T.level(row.level) : T.t2)
@@ -87,11 +81,13 @@ struct AutoSwitchRow: View {
             Switch(isOn: model.autoEnabled, enabled: model.cli == .ready) { model.setAutoEnabled($0) }
             Chevron()
         }
-        .padding(.horizontal, 10).padding(.vertical, 7)
+        .frame(minHeight: RowMetrics.contentHeight)
+        .padding(.horizontal, 10).padding(.vertical, RowMetrics.vPadding)
         .contentShape(Rectangle())
-        .hoverHighlight()
+        .hoverHighlight(radius: 8)
         .handCursor()
-        .padding(.horizontal, 4).padding(.vertical, 1)
+        .padding(.horizontal, 4)
+        .padding(.top, Toolbar.topGap)  // 与下方工具栏自带的间隙相等，上下离分割线一样远
         .onTapGesture { model.push(.autoSwitch) }
     }
 }
@@ -136,8 +132,11 @@ struct Toolbar: View {
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
         .overlay(alignment: .top) { Rectangle().fill(T.sep).frame(height: 0.5) }
-        .padding(.top, 6)
+        .padding(.top, Self.topGap)
     }
+
+    /// 工具栏分割线上方的间隙
+    static let topGap: CGFloat = 6
 }
 
 /// 整个面板的特殊状态：找不到命令行、读取中、不兼容、没有账号、读不到

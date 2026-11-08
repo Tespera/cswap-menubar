@@ -51,6 +51,13 @@ public enum Fmt {
         return "\(weekdayClock(at, calendar: cal)) 刷新"
     }
 
+    /// 「预计 5 时 20 分后用完」「预计周二 09:55 用完」（与 refresh 同一套写法）
+    public static func exhaustion(_ at: Date, now: Date, calendar cal: Calendar = calendar) -> String {
+        let left = at.timeIntervalSince(now)
+        if left < 24 * 3600 { return "预计 \(duration(max(left, 60)))后用完" }
+        return "预计\(weekdayClock(at, calendar: cal)) 用完"
+    }
+
     /// 「周三 05:00」
     public static func weekdayClock(_ d: Date, calendar cal: Calendar = calendar) -> String {
         let c = cal.dateComponents([.weekday, .hour, .minute], from: d)

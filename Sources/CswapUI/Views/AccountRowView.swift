@@ -10,7 +10,7 @@ struct AccountRowView: View {
     var body: some View {
         let busy = model.busy.contains(row.number)
         HStack(spacing: 9) {
-            AvatarView(style: row.avatar, size: 28)
+            AvatarView(style: row.avatar, size: RowMetrics.leading)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(row.name).font(F.sys(12, .medium)).lineLimit(1).truncationMode(.middle)
@@ -43,7 +43,8 @@ struct AccountRowView: View {
                 }
             }
         }
-        .padding(.horizontal, 10).padding(.vertical, 9)
+        .frame(minHeight: RowMetrics.contentHeight)
+        .padding(.horizontal, 10).padding(.vertical, RowMetrics.vPadding)
         .background {
             if row.isCurrent {
                 RoundedRectangle(cornerRadius: 8, style: .continuous).fill(T.accent.opacity(0.12))
@@ -78,6 +79,13 @@ struct AccountRowView: View {
         .font(F.sys(10, .medium))
         .lineLimit(1)
     }
+}
+
+/// 账号行与自动切换行共用的尺寸，两种行高度一致
+enum RowMetrics {
+    static let leading: CGFloat = 28       // 头像 / 图标列宽
+    static let contentHeight: CGFloat = 34 // 内容区最小高度（两行文字）
+    static let vPadding: CGFloat = 9
 }
 
 /// 账号右键菜单

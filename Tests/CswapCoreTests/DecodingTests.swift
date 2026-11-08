@@ -164,3 +164,41 @@ struct VersionTests {
         #expect(log.contains("\n## \(AppVersion.current) "), "CHANGELOG.md 缺 \(AppVersion.current) 这一节")
     }
 }
+
+@Suite("升级结果")
+struct UpgradeOutcomeTests {
+    let pinnedOut = """
+    Nothing to upgrade
+
+    hint: `claude-swap` is pinned to `0.30.0` (installed with an exact version pin); reinstall with `uv tool install claude-swap@latest` to upgrade to a new version.
+    claude-swap is still at 0.30.0.
+    """
+
+    @Test func upgraded() {
+        #expect(UpgradeOutcome.evaluate(before: "0.30.0", after: "1.0.0", latest: "1.0.0", output: "") == .upgraded(from: "0.30.0", to: "1.0.0"))
+    }
+
+    @Test func pinnedIsNotUpToDate() {
+        let r = UpgradeOutcome.evaluate(before: "0.30.0", after: "0.30.0", latest: "1.0.0", output: pinnedOut)
+        #expect(r == .pinned(current: "0.30.0", latest: "1.0.0"))
+        #expect(!r.isOK)
+        #expect(r.blockedNote?.contains("0.30.0") == true)
+        #expect(r.reinstallCommand?.contains("@latest") == true)
+        #expect(r.reinstallCommand?.contains("exclude-newer") == false)
+    }
+
+    @Test func cooldown() {
+        let out = "claude-swap 1.0.0 is on PyPI, but this install has a release cooldown\n  (uv-receipt.toml: exclude-newer-span = \"P14D\")"
+        #expect(UpgradeOutcome.evaluate(before: "0.30.0", after: "0.30.0", latest: "1.0.0", output: out) == .cooldown(current: "0.30.0", latest: "1.0.0"))
+    }
+
+    @Test func unchangedWithoutReason() {
+        let r = UpgradeOutcome.evaluate(before: "0.30.0", after: "0.30.0", latest: "1.0.0", output: "Nothing to upgrade")
+        #expect(r == .unchanged(current: "0.30.0", latest: "1.0.0"))
+        #expect(r.blockedNote == nil)
+    }
+
+    @Test func upToDate() {
+        #expect(UpgradeOutcome.evaluate(before: "1.0.0", after: "1.0.0", latest: "1.0.0", output: "Nothing to upgrade") == .upToDate)
+    }
+}

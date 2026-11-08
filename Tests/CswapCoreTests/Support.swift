@@ -22,12 +22,15 @@ func utcCalendar() -> Calendar {
     return c
 }
 
-func account(_ n: Int, active: Bool = false, five: Double? = 10, week: Double? = 20, ahead: Bool? = nil,
+/// exhaustIn：按当前速度多久后用完（cswap 的 willLastToReset=false + projectedExhaustionAt）
+func account(_ n: Int, active: Bool = false, five: Double? = 10, week: Double? = 20, ahead: Bool? = nil, exhaustIn: TimeInterval? = nil,
              status: UsageStatus = .ok, disabled: Bool? = nil, threshold: Double? = nil, alias: String? = nil,
              weekReset: Date? = nil, plan: Plan? = Plan(label: "Free", tier: "default_claude_ai")) -> Account {
     let usage = Usage(fiveHour: five.map { UsageWindow(pct: $0, resetsAt: fixtureNow.addingTimeInterval(3600)) },
                       sevenDay: week.map { UsageWindow(pct: $0, resetsAt: weekReset ?? fixtureNow.addingTimeInterval(3 * 86400),
-                                                  expectedPct: 40, aheadOfPace: ahead) })
+                                                  expectedPct: 40, aheadOfPace: ahead,
+                                                  projectedExhaustionAt: exhaustIn.map { fixtureNow.addingTimeInterval($0) },
+                                                  willLastToReset: exhaustIn == nil ? nil : false) })
     return Account(number: n, email: "user\(n)@example.com", active: active, usageStatus: status,
                    usage: five == nil && week == nil ? nil : usage, disabled: disabled, threshold: threshold,
                    alias: alias, plan: plan)

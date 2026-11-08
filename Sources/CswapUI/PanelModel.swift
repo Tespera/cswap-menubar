@@ -40,6 +40,17 @@ public final class PanelModel {
     public private(set) var history: [HistoryItem] = []
     public private(set) var cswapVersion: String?
     public private(set) var latestVersion: String?
+    /// 上次升级 / 检查更新的结果，显示在设置页「cswap 命令行」那一栏里（不弹到底部）；版本变了就清空
+    public private(set) var versionNote: VersionNote?
+    public enum VersionNote: Equatable {
+        case upgrade(UpgradeOutcome)
+        case failed(String)
+    }
+    /// 升级被版本锁定 / 冷却期挡住、要到终端重装
+    public var upgradeBlocked: UpgradeOutcome? {
+        if case .upgrade(let r) = versionNote, r.reinstallCommand != nil { return r }
+        return nil
+    }
     public private(set) var upgrading = false
     public private(set) var checkingUpdate = false
     public private(set) var now = Date()
@@ -111,6 +122,11 @@ public final class PanelModel {
 
     public var versionText: String {
         guard let v = cswapVersion else { return cli == .missing ? "没找到" : "读取中" }
+        switch versionNote {
+        case .upgrade(let r) where r != .upToDate: return r.blockedNote ?? r.message
+        case .failed(let why): return "\(v)，\(why)"
+        default: break
+        }
         if CswapVersion.isOlder(v, than: CswapVersion.minimum) { return "\(v)，低于 \(CswapVersion.minimum)，建议升级" }
         if let l = latestVersion, CswapVersion.isOlder(v, than: l) { return "\(v)，可升级到 \(l)" }
         if latestVersion != nil { return "\(v)，已是最新" }
@@ -119,6 +135,12 @@ public final class PanelModel {
 
     public var versionLevel: Level {
         guard let v = cswapVersion else { return .off }
+        switch versionNote {
+        case .upgrade(.upgraded): return .ok
+        case .upgrade(let r) where !r.isOK: return .warn
+        case .failed: return .warn
+        default: break
+        }
         if CswapVersion.isOlder(v, than: CswapVersion.minimum) { return .warn }
         if let l = latestVersion, CswapVersion.isOlder(v, than: l) { return .warn }
         return .off
@@ -192,6 +214,8 @@ public final class PanelModel {
             refreshing = false
             if refreshAgain { refreshAgain = false; Task { await refresh() } }
         }
+        // 升级被挡住后用户可能已在终端重装：每轮顺带重读版本，变了就清掉提示
+        if upgradeBlocked != nil { await loadVersion() }
         do {
             var l = try await cswap.json(.list, as: AccountList.self)
             applyNames(&l)
@@ -223,7 +247,9 @@ public final class PanelModel {
 
     private func loadVersion() async {
         guard let cswap, let out = try? await cswap.run(.version) else { return }
-        cswapVersion = CswapVersion.parse(out.stdoutText + out.stderrText)
+        let v = CswapVersion.parse(out.stdoutText + out.stderrText)
+        if v != cswapVersion { versionNote = nil }
+        cswapVersion = v
     }
 
     public func loadConfig() async {
@@ -499,28 +525,48 @@ public final class PanelModel {
 
     public func checkUpdate() {
         checkingUpdate = true
+        versionNote = nil
         Task {
             await loadVersion()
             latestVersion = await UpdateCheck.pypi() ?? latestVersion
             checkingUpdate = false
-            if !canUpgrade, latestVersion != nil { flash("cswap 已是最新", .ok) }
-            if latestVersion == nil { flash("查不到最新版本（网络不通？）", .warn) }
+            if latestVersion == nil { versionNote = .failed("查不到最新版本（网络不通？）") }
         }
     }
 
-    /// 升级 cswap：完成后显示前后版本、重启自动切换
+    /// 升级 cswap：结果写在「cswap 命令行」那一栏；从主面板（没有那一栏）点的升级才在底部提示
     public func upgrade() {
+        guard let cswap else { flash(CLIError.missing.message, .bad); return }
         let before = cswapVersion
         upgrading = true
+        versionNote = nil
         Task {
-            let ok = await perform(.upgrade) != nil
+            let out: CommandOutput
+            do { out = try await cswap.run(.upgrade) } catch {
+                await loadVersion()
+                upgrading = false
+                versionNote = .failed("升级失败：\(error)")
+                if pages.last != .settings { flash("升级失败：\(error)", .bad) }
+                return
+            }
             await loadVersion()
             upgrading = false
-            guard ok else { return }
-            if let b = before, let a = cswapVersion, a != b { flash("已从 \(b) 升级到 \(a)", .ok) }
-            else { flash("cswap 已是最新", .ok) }
-            auto.restart()
+            let r = UpgradeOutcome.evaluate(before: before, after: cswapVersion, latest: latestVersion,
+                                            output: out.stdoutText + "\n" + out.stderrText)
+            versionNote = .upgrade(r)
+            if pages.last != .settings { flash(r.message, r.isOK ? .ok : .warn) }
+            if case .upgraded = r {
+                auto.restart()
+                await refresh()
+            }
         }
+    }
+
+    public func copyReinstallCommand() {
+        guard let cmd = upgradeBlocked?.reinstallCommand else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(cmd, forType: .string)
+        flash("已复制重装命令，到终端粘贴运行", .ok)
     }
 
     public func copyInstallCommand() {
@@ -555,7 +601,7 @@ public final class PanelModel {
     public static func preview(list: AccountList?, config: AutoSwitchConfig? = AutoSwitchConfig(), priorities: [Int: Int]? = nil,
                                autoSwitch: AutoSwitchState = .off, cli: CLIState = .ready, fetchError: String? = nil,
                                pages: [Page] = [], history: [HistoryItem] = [], version: String? = "0.30.0",
-                               latest: String? = "0.30.0", toast: Toast? = nil, now: Date,
+                               latest: String? = "0.30.0", versionNote: VersionNote? = nil, toast: Toast? = nil, now: Date,
                                forImageRenderer: Bool = true) -> PanelModel {
         let m = PanelModel(preview: forImageRenderer)
         m.cli = cli
@@ -570,6 +616,7 @@ public final class PanelModel {
         m.history = history
         m.cswapVersion = version
         m.latestVersion = latest
+        m.versionNote = versionNote
         m.toast = toast
         m.now = now
         m.display = .both
@@ -588,7 +635,6 @@ public final class PanelModel {
                      "菜单栏：\(o.menuBar.items.map { "\($0.text)(\($0.level))" }.joined(separator: " / "))"]
         if let h = o.header { lines.append("当前：\(h.name) \(h.tier?.name ?? "") \(h.tier?.expired == true ? "已到期" : "") · \(h.verdict.text)") }
         lines += o.cards.map { "  \($0.kind.label) \($0.value)% \($0.foot)\($0.pace.map { " 均速 \($0)" } ?? "")" }
-        if let p = o.paceNote { lines.append("  \(p)") }
         lines += o.rows.map { "账号 \($0.number) \($0.name) \($0.tier?.name ?? "") \($0.isCurrent ? "[当前]" : "") \($0.meta)" }
         lines.append("自动切换：\(o.autoRow.subtitle)")
         lines.append("底部：\(o.footer.text)")

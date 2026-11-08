@@ -166,6 +166,8 @@ public struct UsageCard: Sendable, Equatable {
     /// 均速竖线位置（本周卡）
     public var pace: Double?
     public var foot: String
+    /// 按当前速度撑不到刷新时的「预计周二 09:55 用完」（橙字），与 foot 轮流显示
+    public var exhaustion: String? = nil
 }
 
 public struct MiniBar: Sendable, Equatable {
@@ -250,7 +252,6 @@ public struct Overview: Sendable, Equatable {
 
     public var header: Header?
     public var cards: [UsageCard]
-    public var paceNote: String?
     public var rows: [AccountRow]
     public var autoRow: AutoRow
     public var footer: Footer
@@ -274,7 +275,7 @@ public enum OverviewBuilder {
     public static func build(_ i: Inputs) -> Overview {
         let list = i.list
         let active = list?.active
-        let verdict = Self.verdict(list: list)
+        let verdict = Self.verdict(list: list, now: i.now)
         let header = active.map { Header(name: displayName($0), tier: TierBadge.of($0.plan), verdict: verdict) }
         // 当前账号排最前，其余按编号
         let rows = (list?.accounts ?? [])
@@ -294,7 +295,6 @@ public enum OverviewBuilder {
         return Overview(
             header: header,
             cards: active.map { cards(for: $0, now: i.now) } ?? [],
-            paceNote: active.flatMap { paceNote($0, now: i.now) },
             rows: rows,
             autoRow: autoRow(i),
             footer: footer(i),
@@ -324,7 +324,7 @@ public enum OverviewBuilder {
 
     // MARK: 头部状态
 
-    public static func verdict(list: AccountList?) -> Verdict {
+    public static func verdict(list: AccountList?, now: Date) -> Verdict {
         guard let list, let a = list.active else { return Verdict(level: .off, text: "没有登录的账号") }
         if a.usageStatus?.isLoginBroken == true { return Verdict(level: .bad, text: "登录已失效") }
         guard let t = tightest(liveUsage(a)) else { return Verdict(level: .off, text: "读不到用量") }
@@ -334,7 +334,7 @@ public enum OverviewBuilder {
             return Verdict(level: .bad, text: "已用完")
         }
         if t >= Overview.warnLine { return Verdict(level: .warn, text: "快到切换阈值") }
-        if a.usage?.sevenDay?.aheadOfPace == true { return Verdict(level: .warn, text: "用得偏快") }
+        if let w = a.usage?.sevenDay, runsOutBeforeReset(w, now: now) != nil { return Verdict(level: .warn, text: "用得偏快") }
         return Verdict(level: .ok, text: "充足")
     }
 
@@ -356,21 +356,27 @@ public enum OverviewBuilder {
         }
         if let w = u.sevenDay {
             out.append(UsageCard(kind: .week, value: Fmt.pct(w.pct), pct: w.pct, tint: .of(w.pct), pace: w.expectedPct,
-                                 foot: Fmt.refresh(w.resetsAt, now: now) ?? "—"))
+                                 foot: Fmt.refresh(w.resetsAt, now: now) ?? "—",
+                                 exhaustion: liveUsage(a).flatMap { _ in runsOutBeforeReset(w, now: now) }.map { Fmt.exhaustion($0, now: now) }))
         }
         return out
     }
 
-    /// 节奏提示：仅本周 aheadOfPace 时出现；「X 用完」措辞要软（上游认为线性外推不准）
-    public static func paceNote(_ a: Account, now: Date) -> String? {
-        guard let w = a.usage?.sevenDay, w.aheadOfPace == true else { return nil }
-        var s = "本周用得比均速快（竖线是均速）"
-        if w.willLastToReset != true, let eta = w.projectedExhaustionAt, eta > now,
-           w.resetsAt.map({ eta < $0 }) ?? true {
-            s += "，照这样\(Fmt.softMoment(eta, now: now))用完"
+    /// 按当前速度本周额度会在刷新前用完：返回预计用完的时间，否则 nil。
+    /// 用 cswap 的 willLastToReset（线性外推、不设门槛）；不用 aheadOfPace，它要超过均速 15 个点才算，
+    /// 超 11 个点、照样会早一天多用完的情况会被判成「充足」（用户 2026-11-08 决定改）。
+    /// 刷新后头 24 小时不判：时间太短外推不可信（cswap 的偏快标记同样避开这一天）。
+    public static func runsOutBeforeReset(_ w: UsageWindow, now: Date) -> Date? {
+        guard w.willLastToReset == false, let eta = w.projectedExhaustionAt, eta > now else { return nil }
+        if let reset = w.resetsAt {
+            guard eta < reset else { return nil }
+            let elapsed = weekSeconds - reset.timeIntervalSince(now)
+            if elapsed < 24 * 3600 { return nil }
         }
-        return s
+        return eta
     }
+
+    static let weekSeconds: Double = 7 * 86400
 
     // MARK: 账号列表
 

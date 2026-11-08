@@ -182,9 +182,12 @@ struct GeneralSettingsView: View {
             .onTapGesture { model.push(.history) }
             RowSeparator()
             SettingRow(title: "cswap 命令行", subtitle: model.versionText,
-                       subtitleColor: model.versionLevel == .warn ? T.warn : T.t2) {
+                       subtitleColor: model.versionLevel == .off ? T.t2 : T.level(model.versionLevel)) {
                 if model.upgrading {
                     HStack(spacing: 5) { ProgressView().controlSize(.mini); Text("升级中").font(F.sys(11)).foregroundStyle(T.t2) }
+                } else if model.upgradeBlocked != nil {
+                    Button("复制命令") { model.copyReinstallCommand() }.buttonStyle(SmallButtonStyle(kind: .primary))
+                        .help(model.upgradeBlocked?.reinstallCommand ?? "")
                 } else if model.canUpgrade {
                     Button("升级") { model.upgrade() }.buttonStyle(SmallButtonStyle(kind: .primary))
                 } else {

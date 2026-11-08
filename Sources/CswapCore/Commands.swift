@@ -113,6 +113,64 @@ public enum CswapVersion {
     }
 }
 
+/// `cswap upgrade` 跑完后该怎么告诉用户。uv 在「已是最新」「版本被锁定」「新版还在冷却期」时
+/// 都只说 Nothing to upgrade 并正常退出，所以不能只看前后版本是否相同就说「已是最新」。
+public enum UpgradeOutcome: Equatable, Sendable {
+    case upgraded(from: String, to: String)
+    case upToDate
+    /// 安装时锁定了版本（uv tool install 'claude-swap==x'），uv tool upgrade 不会越过
+    case pinned(current: String, latest: String?)
+    /// uv 的 exclude-newer 冷却期把新版藏起来了
+    case cooldown(current: String, latest: String?)
+    /// 新版已发布，但升级后版本没变，原因不明
+    case unchanged(current: String, latest: String)
+
+    public static func evaluate(before: String?, after: String?, latest: String?, output: String) -> UpgradeOutcome {
+        if let b = before, let a = after, a != b { return .upgraded(from: b, to: a) }
+        let current = after ?? before ?? "?"
+        let text = output.lowercased()
+        if text.contains("is pinned to") || text.contains("exact version pin") { return .pinned(current: current, latest: latest) }
+        if text.contains("release cooldown") { return .cooldown(current: current, latest: latest) }
+        if let l = latest, CswapVersion.isOlder(current, than: l) { return .unchanged(current: current, latest: l) }
+        return .upToDate
+    }
+
+    /// 到终端重装、装上最新版的命令（保留 menubar 附加组件）；没有要用户处理的情况为 nil。
+    /// 锁定：@latest 重装后锁定解除，以后 cswap upgrade 正常。冷却期：只能临时把冷却期设为 0
+    /// （阿里云镜像不给上传时间，冷却期在那里会把所有版本都排除掉，所以锁定的情况不带这个参数）。
+    public var reinstallCommand: String? {
+        switch self {
+        case .pinned: return "uv tool install 'claude-swap[menubar]@latest'"
+        case .cooldown: return "uv tool upgrade claude-swap --exclude-newer '0 days'"
+        default: return nil
+        }
+    }
+
+    /// 升级后底部的一句提示
+    public var message: String {
+        switch self {
+        case .upgraded(let b, let a): return "已从 \(b) 升级到 \(a)"
+        case .upToDate: return "cswap 已是最新"
+        case .pinned(let c, _): return "版本被锁在 \(c)，没升上去"
+        case .cooldown(let c, _): return "新版在 uv 冷却期内，仍是 \(c)"
+        case .unchanged(let c, _): return "没升上去，仍是 \(c)"
+        }
+    }
+
+    /// 升不上去且要到终端重装时，设置页「cswap 命令行」一行的说明；按钮改成「复制命令」
+    public var blockedNote: String? {
+        switch self {
+        case .pinned(let c, _): return "版本锁定在 \(c)，需到终端重装"
+        case .cooldown(let c, _): return "\(c)，uv 冷却期挡住了新版，需到终端重装"
+        default: return nil
+        }
+    }
+
+    public var isOK: Bool {
+        switch self { case .upgraded, .upToDate: return true; default: return false }
+    }
+}
+
 /// 一次命令的原始结果
 public struct CommandOutput: Sendable {
     public var status: Int32

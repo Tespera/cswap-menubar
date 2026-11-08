@@ -151,12 +151,47 @@ struct UsageCardView: View {
                 }
             }
             UsageBar(pct: card.pct, tint: card.tint, kind: card.kind, pace: card.pace).padding(.top, 7)
-            Text(card.foot).font(F.num(9.5, .medium)).foregroundStyle(T.t2).lineLimit(1).padding(.top, 6)
+            CardFoot(foot: card.foot, alert: card.exhaustion).padding(.top, 6)
         }
         .padding(.horizontal, 9).padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(9)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// 用量卡底行：有「预计 X 用完」时与「X 刷新」轮流显示，各停 3 秒；
+/// 切换用「向上推」：旧的一行往上淡出、新的一行从下面淡入（同一个位置，像滚动的提示牌），
+/// 两行字长短不一也不跳动。减少动态效果时改成原地淡入淡出。
+struct CardFoot: View {
+    let foot: String
+    let alert: String?
+    static let hold: TimeInterval = 3
+
+    var body: some View {
+        if let alert {
+            TimelineView(.periodic(from: .now, by: Self.hold)) { ctx in
+                let showAlert = Int(ctx.date.timeIntervalSinceReferenceDate / Self.hold) % 2 == 0
+                ZStack(alignment: .leading) {
+                    line(showAlert ? alert : foot, warn: showAlert)
+                        .id(showAlert)
+                        .transition(Motion.reduce ? .opacity : .asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                            removal: .move(edge: .top).combined(with: .opacity)))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .clipped()
+                .animation(.smooth(duration: 0.45), value: showAlert)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(alert)，\(foot)")
+        } else {
+            line(foot, warn: false)
+        }
+    }
+
+    private func line(_ text: String, warn: Bool) -> some View {
+        Text(text).font(F.num(9.5, .medium)).foregroundStyle(warn ? T.warn : T.t2).lineLimit(1)
     }
 }
 
