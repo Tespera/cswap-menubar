@@ -169,12 +169,13 @@ enum AppUpdater {
         let underLaunchd = ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"] == LaunchAgent.label
         if !underLaunchd {
             // 旧进程一消失就 open 会撞上 LaunchServices 还没登记它退出：只「激活」不启动（2026-11-09 实测 0.3.1 → 0.3.2 没起来）。
-            // 所以等 1 秒、用 -n 强制开新实例，确认起来了才结束，最多试 5 次（单实例锁保证不会多开）
+            // 所以等 1 秒、用 -n 强制开新实例，确认起来了才结束，最多试 5 次（单实例锁保证不会多开）。
+            // 「起来了」只认可执行文件路径完全一致的进程：pgrep -f 会被命令行里碰巧含这个路径的任何进程骗过（实测）
             let script = """
             while /bin/kill -0 \(getpid()) 2>/dev/null; do /bin/sleep 0.2; done
             /bin/sleep 1
             for i in 1 2 3 4 5; do
-              /usr/bin/pgrep -f "$0/Contents/MacOS/" >/dev/null && exit 0
+              /bin/ps -axo comm= | /usr/bin/grep -qx "$0/Contents/MacOS/cswap" && exit 0
               /usr/bin/open -n "$0"
               /bin/sleep 3
             done
