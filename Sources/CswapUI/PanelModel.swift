@@ -629,7 +629,11 @@ public final class PanelModel {
     /// 齿轮上的小红点
     public var settingsBadge: Bool { AppUpdateRow.badge(state: appUpdate, isDevBuild: isDevBuild, autoUpdate: autoUpdate) }
 
-    public var changelog: [Changelog.Section] { Changelog.sections(changelogText) }
+    /// 更新日志页：只显示当前版本这一节
+    public var changelog: Changelog.Section? { Changelog.section(changelogText, version: AppVersion.current) }
+
+    /// 全部更新记录在 GitHub 发布页
+    public func openReleasesPage() { NSWorkspace.shared.open(AppUpdate.releasesPage) }
 
     private func startAppUpdates() {
         isDevBuild = AppUpdater.bundleURL == nil

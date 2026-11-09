@@ -184,6 +184,11 @@ public enum Changelog {
         return out
     }
 
+    /// 某一版那一节（App 里的更新日志页只显示当前版本，其余到 GitHub 发布页看）
+    public static func section(_ text: String, version: String) -> Section? {
+        sections(text).first { $0.version == version }
+    }
+
     /// from 为 nil 时只取 to 这一版
     public static func between(_ text: String, from: String?, to: String) -> [Section] {
         sections(text).filter { s in

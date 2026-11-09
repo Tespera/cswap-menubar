@@ -114,6 +114,8 @@ struct AppUpdateTests {
         #expect(all[0].body == "- **自动更新**：后台下载\n- 第二条")
         #expect(Changelog.between(text, from: "0.1.0", to: "0.3.0").map(\.version) == ["0.3.0", "0.2.0"])
         #expect(Changelog.between(text, from: nil, to: "0.2.0").map(\.version) == ["0.2.0"])
+        #expect(Changelog.section(text, version: "0.2.0")?.body == "- 旧的")
+        #expect(Changelog.section(text, version: "9.9.9") == nil)
     }
 
     /// 仓库里真实的 CHANGELOG.md 能解析出当前版本那一节（App 里的更新日志页就是它）

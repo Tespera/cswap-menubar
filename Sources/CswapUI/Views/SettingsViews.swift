@@ -210,7 +210,7 @@ struct GeneralSettingsView: View {
                 Text(model.appVersion).font(F.num(10.5, .medium))
             }
             .buttonStyle(.plain).handCursor().help("更新日志")
-            .disabled(model.changelog.isEmpty)
+            .disabled(model.changelog == nil)
             Spacer()
             Button("退出") { model.quit() }.buttonStyle(.plain).foregroundStyle(T.t2).handCursor()
                 .keyboardShortcut("q", modifiers: .command)
@@ -251,22 +251,17 @@ extension GeneralSettingsView {
 
 // MARK: - 更新日志
 
-/// 打包时放进 App 的 CHANGELOG.md，新的在前
+/// 打包时放进 App 的 CHANGELOG.md：只显示当前版本这一节，更早的到 GitHub 发布页看
 struct ChangelogView: View {
     let model: PanelModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ForEach(model.changelog) { s in
+        VStack(alignment: .leading, spacing: 12) {
+            if let s = model.changelog {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(s.version).font(F.num(13, .semibold))
                         Text(s.date).font(F.num(10.5, .medium)).foregroundStyle(T.t3)
-                        if s.version == AppVersion.current {
-                            Text("当前").font(F.sys(9.5, .semibold)).foregroundStyle(T.t2)
-                                .padding(.horizontal, 5).padding(.vertical, 1)
-                                .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(T.t3.opacity(0.18)))
-                        }
                     }
                     ForEach(Array(Self.lines(s.body).enumerated()), id: \.offset) { _, line in
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -277,6 +272,14 @@ struct ChangelogView: View {
                     }
                 }
             }
+            Button { model.openReleasesPage() } label: {
+                HStack(spacing: 3) {
+                    Text("查看全部更新记录")
+                    Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .semibold))
+                }
+                .font(F.sys(11.5, .medium)).foregroundStyle(T.accent)
+            }
+            .buttonStyle(.plain).handCursor()
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
