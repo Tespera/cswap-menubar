@@ -1,86 +1,63 @@
 import Foundation
 
-/// App 自己的更新（docs/04 §9）：GitHub Release → 下载 → 核对签名 → 替换 → 重启。
-/// 这里只放纯逻辑（解析 Release、挑安装包、状态到界面的映射、更新日志截取），网络与安装在 CswapUI/Services/AppUpdater.swift
+/// App 自己的更新（docs/04 §9）：版本清单 → 下载 → 核对签名 → 替换 → 重启。
+/// 这里只放纯逻辑（解析清单、挑安装包、状态到界面的映射、更新日志截取），网络与安装在 CswapUI/Services/AppUpdater.swift
 public enum AppUpdate {
     public static let repo = "Tespera/cswap-menubar"
-    public static var latestReleaseAPI: URL { URL(string: "https://api.github.com/repos/\(repo)/releases/latest")! }
+    /// 版本清单：CI 发布时随 Release 上传的 latest.json。走网页下载地址而不是 api.github.com——
+    /// 匿名 API 每个出口 IP 每小时只有 60 次、同一网络里的程序共用，实测会被用完（2026-11-09）
+    public static var manifestURL: URL { URL(string: "https://github.com/\(repo)/releases/latest/download/\(manifestName)")! }
+    public static let manifestName = "latest.json"
     public static var releasesPage: URL { URL(string: "https://github.com/\(repo)/releases")! }
-    /// 安装包文件名；tools/package.sh release 与 CI 都按这个名字产出
+    /// 安装包文件名；CI 按这个名字产出（0.3.2 及更早的 App 也按这个名字在 Release 里找，不能改）
     public static func assetName(_ version: String) -> String { "cswap-\(version).zip" }
+    public static func assetURL(_ version: String) -> URL {
+        URL(string: "https://github.com/\(repo)/releases/download/v\(version)/\(assetName(version))")!
+    }
+    public static func releasePage(_ version: String) -> URL { URL(string: "https://github.com/\(repo)/releases/tag/v\(version)")! }
     /// 自动检查间隔
     public static let checkInterval: TimeInterval = 6 * 3600
     /// 检查连续失败超过这么久才在设置页露出来（网络偶尔不通不打扰）
     public static let quietFailureWindow: TimeInterval = 86400
 
-    /// 下载地址：先直连 GitHub，失败再走加速代理（安装前一律核对签名，代理改不了包）
+    /// 下载地址（清单与安装包都用）：先直连 GitHub，失败再走加速代理（安装前一律核对签名，代理改不了包）
     public static func downloadURLs(_ direct: URL) -> [URL] {
         var urls = [direct]
         if let p = URL(string: "https://gh-proxy.com/" + direct.absoluteString) { urls.append(p) }
         return urls
     }
 
-    /// 从 Release 里挑出比当前版本新的安装包；没有新版、或缺安装包 → nil
-    public static func candidate(_ r: GitHubRelease, current: String) -> Candidate? {
-        guard !r.draft, !r.prerelease else { return nil }
-        let v = r.tagName.hasPrefix("v") ? String(r.tagName.dropFirst()) : r.tagName
-        guard v.split(separator: ".").count == 3, v.split(separator: ".").allSatisfy({ Int($0) != nil }),
-              CswapVersion.isOlder(current, than: v),
-              let asset = r.assets.first(where: { $0.name == assetName(v) }) else { return nil }
-        let sha = asset.digest.flatMap { $0.hasPrefix("sha256:") ? String($0.dropFirst(7)).lowercased() : nil }
-        return Candidate(version: v, url: asset.browserDownloadURL, size: asset.size, sha256: sha, page: r.htmlURL)
+    /// 清单里的版本比当前新 → 要装的安装包；版本号不是三位数字、或不比当前新 → nil
+    public static func candidate(_ m: Manifest, current: String) -> Candidate? {
+        let parts = m.version.split(separator: ".")
+        guard parts.count == 3, parts.allSatisfy({ Int($0) != nil }), CswapVersion.isOlder(current, than: m.version) else { return nil }
+        return Candidate(version: m.version, url: assetURL(m.version), sha256: m.sha256?.lowercased(), page: releasePage(m.version))
+    }
+
+    /// latest.json：CI 生成，{"version": "0.3.3", "sha256": "…"}
+    public struct Manifest: Codable, Sendable, Equatable {
+        public var version: String
+        public var sha256: String?
+
+        public init(version: String, sha256: String?) {
+            self.version = version
+            self.sha256 = sha256
+        }
     }
 
     public struct Candidate: Sendable, Equatable {
         public var version: String
         public var url: URL
-        public var size: Int?
-        /// GitHub 给的 sha256（新 Release 都有；没有就只靠签名核对）
+        /// 安装包的 sha256（清单里给的；没有就只靠签名核对）
         public var sha256: String?
         public var page: URL?
 
-        public init(version: String, url: URL, size: Int? = nil, sha256: String? = nil, page: URL? = nil) {
+        public init(version: String, url: URL, sha256: String? = nil, page: URL? = nil) {
             self.version = version
             self.url = url
-            self.size = size
             self.sha256 = sha256
             self.page = page
         }
-    }
-}
-
-/// GitHub `releases/latest` 里用得到的部分
-public struct GitHubRelease: Decodable, Sendable {
-    public struct Asset: Decodable, Sendable {
-        public var name: String
-        public var browserDownloadURL: URL
-        public var size: Int?
-        public var digest: String?
-
-        enum CodingKeys: String, CodingKey {
-            case name, size, digest
-            case browserDownloadURL = "browser_download_url"
-        }
-    }
-    public var tagName: String
-    public var draft: Bool
-    public var prerelease: Bool
-    public var htmlURL: URL?
-    public var assets: [Asset]
-
-    enum CodingKeys: String, CodingKey {
-        case draft, prerelease, assets
-        case tagName = "tag_name"
-        case htmlURL = "html_url"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        tagName = try c.decode(String.self, forKey: .tagName)
-        draft = try c.decodeIfPresent(Bool.self, forKey: .draft) ?? false
-        prerelease = try c.decodeIfPresent(Bool.self, forKey: .prerelease) ?? false
-        htmlURL = try c.decodeIfPresent(URL.self, forKey: .htmlURL)
-        assets = try c.decodeIfPresent([Asset].self, forKey: .assets) ?? []
     }
 }
 

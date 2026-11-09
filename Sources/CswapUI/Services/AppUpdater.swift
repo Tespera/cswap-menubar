@@ -36,16 +36,23 @@ enum AppUpdater {
 
     // MARK: 检查
 
-    static func latest() async throws -> GitHubRelease {
-        var req = URLRequest(url: AppUpdate.latestReleaseAPI)
-        req.timeoutInterval = 15
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("cswap-menubar/\(AppVersion.current)", forHTTPHeaderField: "User-Agent")
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let http = resp as? HTTPURLResponse else { throw Failure("没有响应") }
-        if http.statusCode == 404 { throw Failure("还没有发布版本") }
-        guard http.statusCode == 200 else { throw Failure("GitHub 返回 \(http.statusCode)") }
-        return try JSONDecoder().decode(GitHubRelease.self, from: data)
+    /// 读版本清单：直连失败走代理；没有发布过（404）当作「没有新版」以外的失败
+    static func latest() async throws -> AppUpdate.Manifest {
+        var lastError: Error = Failure("查不到版本清单")
+        for url in AppUpdate.downloadURLs(AppUpdate.manifestURL) {
+            do {
+                var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+                req.timeoutInterval = 15
+                req.setValue("cswap-menubar/\(AppVersion.current)", forHTTPHeaderField: "User-Agent")
+                let (data, resp) = try await URLSession.shared.data(for: req)
+                let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                guard code == 200 else { throw Failure(code == 404 ? "还没有发布版本" : "GitHub 返回 \(code)") }
+                return try JSONDecoder().decode(AppUpdate.Manifest.self, from: data)
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
     }
 
     // MARK: 下载与核对
@@ -155,13 +162,23 @@ enum AppUpdater {
     }
 
     /// 退出后再打开：由 LaunchAgent（登录时打开）拉起的，非零退出让 launchd 按 KeepAlive 重新拉起；
-    /// 否则起一个独立会话的小脚本，等本进程结束后 open（单实例锁随进程释放）
+    /// 否则起一个独立会话的小脚本，等本进程结束后打开新版并确认起来了（单实例锁随进程释放）
     @MainActor
     static func relaunch(_ app: URL, beforeQuit: () -> Void) {
         beforeQuit()
         let underLaunchd = ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"] == LaunchAgent.label
         if !underLaunchd {
-            let script = "while /bin/kill -0 \(getpid()) 2>/dev/null; do /bin/sleep 0.2; done; /usr/bin/open \"$0\""
+            // 旧进程一消失就 open 会撞上 LaunchServices 还没登记它退出：只「激活」不启动（2026-11-09 实测 0.3.1 → 0.3.2 没起来）。
+            // 所以等 1 秒、用 -n 强制开新实例，确认起来了才结束，最多试 5 次（单实例锁保证不会多开）
+            let script = """
+            while /bin/kill -0 \(getpid()) 2>/dev/null; do /bin/sleep 0.2; done
+            /bin/sleep 1
+            for i in 1 2 3 4 5; do
+              /usr/bin/pgrep -f "$0/Contents/MacOS/" >/dev/null && exit 0
+              /usr/bin/open -n "$0"
+              /bin/sleep 3
+            done
+            """
             spawnDetached("/bin/sh", ["-c", script, app.path])
         }
         exit(underLaunchd ? 75 : 0)

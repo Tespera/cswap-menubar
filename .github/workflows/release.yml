@@ -1,5 +1,6 @@
 # 发布：本地 tools/package.sh release 推送 v<版本> 标签 → 这里测试、打包、用固定证书签名、发 GitHub Release。
-# App 内的自动更新读 releases/latest，按文件名 cswap-<版本>.zip 找安装包，并核对签名证书与已安装的一致。
+# App 内的自动更新读最新 Release 的 latest.json（版本 + sha256），下载 cswap-<版本>.zip，并核对签名证书与已安装的一致。
+# 0.3.2 及更早的 App 走 GitHub API 按文件名找安装包，所以安装包文件名不能改。
 # 需要两个仓库密钥：CSWAP_P12_BASE64（「cswap Code Signing」证书导出的 .p12，base64）、CSWAP_P12_PASSWORD
 name: Release
 
@@ -56,11 +57,17 @@ jobs:
           ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
 
+      - name: 版本清单（App 检查更新读它，不走有次数限制的 GitHub API）
+        run: |
+          SHA="$(shasum -a 256 "dist/cswap-${VERSION}.zip" | cut -d' ' -f1)"
+          printf '{"version": "%s", "sha256": "%s"}\n' "$VERSION" "$SHA" > dist/latest.json
+          cat dist/latest.json
+
       - name: 发布
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "dist/cswap-${VERSION}.zip" \
+          gh release create "$GITHUB_REF_NAME" "dist/cswap-${VERSION}.zip" dist/latest.json \
             --title "cswap ${VERSION}" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
 
       - name: 清理钥匙串

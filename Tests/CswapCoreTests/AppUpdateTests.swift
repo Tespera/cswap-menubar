@@ -4,41 +4,30 @@ import Testing
 
 @Suite("App 更新")
 struct AppUpdateTests {
-    /// GitHub releases/latest 的形状（字段名照官方文档，只留用得到的）
-    func release(tag: String, assets: [String], draft: Bool = false, digest: String? = "sha256:ABCDEF") throws -> GitHubRelease {
-        let list = assets.map { n in
-            """
-            {"name": "\(n)", "size": 1234, \(digest.map { "\"digest\": \"\($0)\"," } ?? "")
-             "browser_download_url": "https://github.com/\(AppUpdate.repo)/releases/download/\(tag)/\(n)"}
-            """
-        }.joined(separator: ",")
-        let json = """
-        {"tag_name": "\(tag)", "draft": \(draft), "prerelease": false,
-         "html_url": "https://github.com/\(AppUpdate.repo)/releases/tag/\(tag)", "assets": [\(list)]}
-        """
-        return try JSONDecoder().decode(GitHubRelease.self, from: Data(json.utf8))
+    func manifest(_ json: String) throws -> AppUpdate.Manifest {
+        try JSONDecoder().decode(AppUpdate.Manifest.self, from: Data(json.utf8))
     }
 
-    @Test func picksNewerAsset() throws {
-        let c = AppUpdate.candidate(try release(tag: "v0.3.0", assets: ["cswap-0.3.0.zip", "other.txt"]), current: "0.2.0")
-        #expect(c?.version == "0.3.0")
-        #expect(c?.url.lastPathComponent == "cswap-0.3.0.zip")
+    @Test func picksNewerFromManifest() throws {
+        let c = AppUpdate.candidate(try manifest(#"{"version": "0.3.3", "sha256": "ABCDEF"}"#), current: "0.3.2")
+        #expect(c?.version == "0.3.3")
+        #expect(c?.url.absoluteString == "https://github.com/\(AppUpdate.repo)/releases/download/v0.3.3/cswap-0.3.3.zip")
         #expect(c?.sha256 == "abcdef")
-        #expect(c?.size == 1234)
+        #expect(c?.page?.absoluteString == "https://github.com/\(AppUpdate.repo)/releases/tag/v0.3.3")
+        #expect(AppUpdate.manifestURL.absoluteString == "https://github.com/\(AppUpdate.repo)/releases/latest/download/latest.json")
     }
 
-    @Test func ignoresSameOrOlderDraftOrMissingAsset() throws {
-        #expect(AppUpdate.candidate(try release(tag: "v0.2.0", assets: ["cswap-0.2.0.zip"]), current: "0.2.0") == nil)
-        #expect(AppUpdate.candidate(try release(tag: "v0.1.9", assets: ["cswap-0.1.9.zip"]), current: "0.2.0") == nil)
-        #expect(AppUpdate.candidate(try release(tag: "v0.3.0", assets: ["cswap-0.3.0.zip"], draft: true), current: "0.2.0") == nil)
-        #expect(AppUpdate.candidate(try release(tag: "v0.3.0", assets: ["cswap.zip"]), current: "0.2.0") == nil)
-        #expect(AppUpdate.candidate(try release(tag: "nightly", assets: ["cswap-nightly.zip"]), current: "0.2.0") == nil)
+    @Test func ignoresSameOrOlderOrMalformed() throws {
+        #expect(AppUpdate.candidate(try manifest(#"{"version": "0.3.2"}"#), current: "0.3.2") == nil)
+        #expect(AppUpdate.candidate(try manifest(#"{"version": "0.3.1"}"#), current: "0.3.2") == nil)
+        #expect(AppUpdate.candidate(try manifest(#"{"version": "nightly"}"#), current: "0.3.2") == nil)
+        #expect(AppUpdate.candidate(try manifest(#"{"version": "1.0"}"#), current: "0.3.2") == nil)
         // 0.10.0 比 0.9.0 新（按数字比，不按字符串）
-        #expect(AppUpdate.candidate(try release(tag: "v0.10.0", assets: ["cswap-0.10.0.zip"]), current: "0.9.0")?.version == "0.10.0")
+        #expect(AppUpdate.candidate(try manifest(#"{"version": "0.10.0"}"#), current: "0.9.0")?.version == "0.10.0")
     }
 
-    @Test func noDigestMeansSignatureOnly() throws {
-        let c = AppUpdate.candidate(try release(tag: "v0.3.0", assets: ["cswap-0.3.0.zip"], digest: nil), current: "0.2.0")
+    @Test func noShaMeansSignatureOnly() throws {
+        let c = AppUpdate.candidate(try manifest(#"{"version": "0.4.0"}"#), current: "0.3.2")
         #expect(c != nil && c?.sha256 == nil)
     }
 

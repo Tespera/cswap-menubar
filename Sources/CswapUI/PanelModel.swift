@@ -664,9 +664,9 @@ public final class PanelModel {
         }
         if manual { appUpdate = .checking }
         do {
-            let r = try await AppUpdater.latest()
+            let m = try await AppUpdater.latest()
             appCheckFailedSince = nil
-            guard let c = AppUpdate.candidate(r, current: AppVersion.current) else {
+            guard let c = AppUpdate.candidate(m, current: AppVersion.current) else {
                 appUpdate = .idle
                 appUpToDate = true
                 return
