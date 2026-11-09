@@ -35,4 +35,7 @@ struct Preferences {
         get { d.string(forKey: Key.pendingUpdateFrom.rawValue) }
         set { d.set(newValue, forKey: Key.pendingUpdateFrom.rawValue) }
     }
+
+    /// 马上写盘：更新安装后进程会立即退出，不等就会丢掉刚写的值（实测 0.2.99 → 0.3.0 丢过「已更新到」）
+    static func flush() { d.synchronize() }
 }

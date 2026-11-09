@@ -172,10 +172,9 @@ public final class PanelModel {
         return CswapVersion.isOlder(v, than: latestVersion ?? CswapVersion.minimum)
     }
 
-    /// 「版本 0.1.0（构建 12）」；不在打包的 App 里运行（swift run、截图工具）时标为开发版
+    /// 「版本 0.3.0」；不在打包的 App 里运行（swift run、截图工具）时标为开发版
     public var appVersion: String {
-        guard let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String else { return "版本 \(AppVersion.current)（开发版）" }
-        return "版本 \(AppVersion.current)（构建 \(build)）"
+        Bundle.main.infoDictionary?["CFBundleVersion"] == nil && !isPreview ? "版本 \(AppVersion.current)（开发版）" : "版本 \(AppVersion.current)"
     }
 
     // MARK: 启动与刷新
@@ -642,6 +641,8 @@ public final class PanelModel {
             if CswapVersion.isOlder(from, than: AppVersion.current) { justUpdated = AppVersion.current }
         }
         guard !isDevBuild else { return }
+        // 上次更新留下的下载与解压文件
+        try? FileManager.default.removeItem(at: AppUpdater.stagingRoot)
         updateLoop = Task { [weak self] in
             try? await Task.sleep(for: .seconds(30))   // 启动先让 cswap 那边跑起来
             while !Task.isCancelled {

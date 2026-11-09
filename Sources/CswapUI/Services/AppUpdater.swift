@@ -150,6 +150,7 @@ enum AppUpdater {
         }
         try? fm.removeItem(at: backup)
         Preferences.pendingUpdateFrom = AppVersion.current
+        Preferences.flush()
         relaunch(current, beforeQuit: beforeQuit)
     }
 

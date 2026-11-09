@@ -117,15 +117,15 @@ public struct AppUpdateRow: Sendable, Equatable {
         case .checking:
             return AppUpdateRow(subtitle: current, level: .off, action: .checking, spinning: false)
         case .available(let c):
-            return AppUpdateRow(subtitle: "\(current)，可更新到 \(c.version)", level: .ok,
+            return AppUpdateRow(subtitle: "有新版本 \(c.version)", level: .ok,
                                 action: canInstall ? .update : .openPage, spinning: false)
         case .downloading(let c):
             return AppUpdateRow(subtitle: "正在下载 \(c.version)", level: .off, action: .none, spinning: true)
         case .ready(let c):
-            return AppUpdateRow(subtitle: autoUpdate ? "\(c.version) 已下载，关掉面板后自动安装" : "\(c.version) 已下载",
+            return AppUpdateRow(subtitle: autoUpdate ? "\(c.version) 已准备好，稍后自动更新" : "\(c.version) 已准备好",
                                 level: .ok, action: .installNow, spinning: false)
         case .installing(let v):
-            return AppUpdateRow(subtitle: "正在安装 \(v)，马上重启", level: .off, action: .none, spinning: true)
+            return AppUpdateRow(subtitle: "正在更新到 \(v)…", level: .off, action: .none, spinning: true)
         case .failed(let why):
             return AppUpdateRow(subtitle: "更新失败：\(why)", level: .warn, action: .retry, spinning: false)
         case .idle:

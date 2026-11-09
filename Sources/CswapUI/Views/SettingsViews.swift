@@ -199,7 +199,7 @@ struct GeneralSettingsView: View {
             appRow
             if !model.isDevBuild {
                 RowSeparator()
-                SettingRow(title: "自动更新", subtitle: "后台下载，关掉面板时安装并重启") {
+                SettingRow(title: "自动更新", subtitle: "有新版本时自动更新") {
                     Switch(isOn: model.autoUpdate) { model.setAutoUpdate($0) }
                 }
             }
