@@ -195,10 +195,22 @@ struct GeneralSettingsView: View {
                         .buttonStyle(SmallButtonStyle()).disabled(model.checkingUpdate || model.cli != .ready)
                 }
             }
+            RowSeparator()
+            appRow
+            if !model.isDevBuild {
+                RowSeparator()
+                SettingRow(title: "自动更新", subtitle: "后台下载，关掉面板时安装并重启") {
+                    Switch(isOn: model.autoUpdate) { model.setAutoUpdate($0) }
+                }
+            }
         }
 
         HStack {
-            Text(model.appVersion).font(F.num(10.5, .medium))
+            Button { model.push(.changelog) } label: {
+                Text(model.appVersion).font(F.num(10.5, .medium))
+            }
+            .buttonStyle(.plain).handCursor().help("更新日志")
+            .disabled(model.changelog.isEmpty)
             Spacer()
             Button("退出") { model.quit() }.buttonStyle(.plain).foregroundStyle(T.t2).handCursor()
                 .keyboardShortcut("q", modifiers: .command)
@@ -206,6 +218,83 @@ struct GeneralSettingsView: View {
         .font(F.sys(10.5, .medium))
         .foregroundStyle(T.t3)
         .padding(.horizontal, 14).padding(.top, 12)
+    }
+}
+
+extension GeneralSettingsView {
+    /// 「cswap App」：版本 + 更新状态 + 按钮（状态到文案的映射在 CswapCore/AppUpdate.swift）
+    @ViewBuilder var appRow: some View {
+        let r = model.appUpdateRow
+        SettingRow(title: "cswap App", subtitle: r.subtitle, subtitleColor: r.level == .off ? T.t2 : T.level(r.level)) {
+            if r.spinning {
+                ProgressView().controlSize(.mini)
+            } else {
+                switch r.action {
+                case .check, .checking:
+                    Button(r.action == .checking ? "检查中…" : "检查更新") { model.appUpdateAction(.check) }
+                        .buttonStyle(SmallButtonStyle()).disabled(r.action == .checking)
+                case .update:
+                    Button("更新") { model.appUpdateAction(.update) }.buttonStyle(SmallButtonStyle(kind: .primary))
+                case .installNow:
+                    Button("立即更新") { model.appUpdateAction(.installNow) }.buttonStyle(SmallButtonStyle(kind: .primary))
+                case .retry:
+                    Button("重试") { model.appUpdateAction(.retry) }.buttonStyle(SmallButtonStyle())
+                case .openPage:
+                    Button("去下载") { model.appUpdateAction(.openPage) }.buttonStyle(SmallButtonStyle(kind: .primary))
+                case .none:
+                    EmptyView()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 更新日志
+
+/// 打包时放进 App 的 CHANGELOG.md，新的在前
+struct ChangelogView: View {
+    let model: PanelModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(model.changelog) { s in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(s.version).font(F.num(13, .semibold))
+                        Text(s.date).font(F.num(10.5, .medium)).foregroundStyle(T.t3)
+                        if s.version == AppVersion.current {
+                            Text("当前").font(F.sys(9.5, .semibold)).foregroundStyle(T.t2)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(T.t3.opacity(0.18)))
+                        }
+                    }
+                    ForEach(Array(Self.lines(s.body).enumerated()), id: \.offset) { _, line in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            if line.bullet { Text("·").font(F.sys(11.5, .bold)).foregroundStyle(T.t3) }
+                            Text(Self.markdown(line.text)).font(F.sys(11.5)).foregroundStyle(line.bullet ? Color.primary : T.t2)
+                                .lineSpacing(2).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    struct Line { var bullet: Bool; var text: String }
+
+    /// 每行一条：「- 」开头的是列表项，其余是说明文字；空行丢掉
+    static func lines(_ body: String) -> [Line] {
+        body.split(separator: "\n").compactMap { raw in
+            let t = raw.trimmingCharacters(in: .whitespaces)
+            guard !t.isEmpty else { return nil }
+            return t.hasPrefix("- ") ? Line(bullet: true, text: String(t.dropFirst(2))) : Line(bullet: false, text: t)
+        }
+    }
+
+    static func markdown(_ s: String) -> AttributedString {
+        (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
     }
 }
 

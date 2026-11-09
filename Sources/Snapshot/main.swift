@@ -78,6 +78,11 @@ let history = [
 var customConfig = AutoSwitchConfig(threshold: 90, weeklyThreshold: 97, cooldownSeconds: 300, strategy: .best)
 customConfig.model = nil
 
+let newApp = AppUpdate.Candidate(version: "0.4.0", url: URL(string: "https://example.com/cswap-0.4.0.zip")!)
+/// 仓库里的 CHANGELOG.md（App 里由打包放进 Resources）
+let changelogText = (try? String(contentsOf: URL(filePath: #filePath).deletingLastPathComponent()
+    .appending(path: "../../CHANGELOG.md").standardized, encoding: .utf8)) ?? ""
+
 struct Scenario {
     let name: String
     let model: @MainActor () -> PanelModel
@@ -111,6 +116,17 @@ let scenarios: [Scenario] = [
                  versionNote: .upgrade(.upgraded(from: "0.30.0", to: "1.0.0")), now: now)
     },
     .init(name: "14-history") { .preview(list: realList, pages: [.history], history: history, now: now) },
+    // App 自己的更新
+    .init(name: "15-just-updated") { .preview(list: realList, now: now, justUpdated: AppVersion.current) },
+    .init(name: "15b-update-badge") { .preview(list: realList, now: now, appUpdate: .available(newApp), autoUpdate: false) },
+    .init(name: "15c-settings-available") {
+        .preview(list: realList, pages: [.settings], now: now, appUpdate: .available(newApp), autoUpdate: false)
+    },
+    .init(name: "15d-settings-ready") { .preview(list: realList, pages: [.settings], now: now, appUpdate: .ready(newApp)) },
+    .init(name: "15e-settings-failed") {
+        .preview(list: realList, pages: [.settings], now: now, appUpdate: .failed("安装包签名不对，已丢弃"))
+    },
+    .init(name: "16-changelog") { .preview(list: realList, pages: [.changelog], now: now, changelog: changelogText) },
 ]
 
 @MainActor

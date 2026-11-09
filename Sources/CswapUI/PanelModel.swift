@@ -9,6 +9,7 @@ public enum Page: Hashable, Sendable {
     case autoSwitch
     case settings
     case history
+    case changelog
 }
 
 /// 底部的临时提示（操作结果、错误），几秒后消失
@@ -55,6 +56,25 @@ public final class PanelModel {
     public private(set) var checkingUpdate = false
     public private(set) var now = Date()
 
+    // MARK: App 自己的更新
+    public private(set) var appUpdate: AppUpdateState = .idle
+    /// 上次检查成功且没有新版
+    public private(set) var appUpToDate = false
+    /// 检查连续失败的起点（成功一次就清空）；不到一天设置页不露出来
+    public private(set) var appCheckFailedSince: Date?
+    /// 刚从哪个版本更新上来：新版第一次打开面板时底部显示「已更新到 …」，关掉面板后不再显示
+    public private(set) var justUpdated: String?
+    @ObservationIgnored private var justUpdatedShown = false
+    /// 打包后的 App（不是 swift run / 截图工具）
+    public private(set) var isDevBuild = true
+    /// 有固定证书签名、能自己替换
+    @ObservationIgnored private var canSelfInstall = false
+    @ObservationIgnored private var readyApp: URL?
+    @ObservationIgnored private var updateLoop: Task<Void, Never>?
+    @ObservationIgnored private var installRetry: Task<Void, Never>?
+    /// 打包时放进 App 的 CHANGELOG.md（开发运行时为空）
+    @ObservationIgnored public private(set) var changelogText = ""
+
     // MARK: 交互状态
     public var pages: [Page] = []
     public private(set) var busy: Set<Int> = []
@@ -73,6 +93,7 @@ public final class PanelModel {
     public private(set) var notifyExpiry = Preferences.flag(.notifyExpiry, default: true)
     public private(set) var autoEnabled = Preferences.flag(.autoSwitch, default: false)
     public private(set) var launchAtLogin = LaunchAgent.isInstalled
+    public private(set) var autoUpdate = Preferences.flag(.autoUpdate, default: true)
 
     // MARK: 服务
     @ObservationIgnored private var cswap: CswapCLI?
@@ -171,6 +192,7 @@ public final class PanelModel {
             }
         }
         Task { await locate() }
+        startAppUpdates()
     }
 
     /// 找 cswap；找不到时面板显示安装引导，用户装好后点「重新查找」
@@ -236,6 +258,7 @@ public final class PanelModel {
 
     public func panelDidShow() {
         panelVisible = true
+        if justUpdated != nil { justUpdatedShown = true }
         now = Date()
         if Date().timeIntervalSince(listFetchedAt ?? .distantPast) > 5 { Task { await refresh() } }
     }
@@ -243,6 +266,8 @@ public final class PanelModel {
     public func panelDidHide() {
         panelVisible = false
         pages.removeAll()
+        if justUpdatedShown { justUpdated = nil }
+        installIfIdle()
     }
 
     private func loadVersion() async {
@@ -286,7 +311,7 @@ public final class PanelModel {
         case .detail: Task { await loadPriorities(); await loadConfig() }
         case .autoSwitch: Task { await loadConfig(); await loadPriorities() }
         case .history: reloadHistory()
-        case .settings: break
+        case .settings, .changelog: break
         }
     }
 
@@ -595,6 +620,133 @@ public final class PanelModel {
         }
     }
 
+    // MARK: App 更新（docs/04 §9）
+
+    public var appUpdateRow: AppUpdateRow {
+        AppUpdateRow.build(state: appUpdate, current: AppVersion.current, isDevBuild: isDevBuild, canInstall: canSelfInstall,
+                           autoUpdate: autoUpdate, upToDate: appUpToDate, checkFailedSince: appCheckFailedSince, now: now)
+    }
+
+    /// 齿轮上的小红点
+    public var settingsBadge: Bool { AppUpdateRow.badge(state: appUpdate, isDevBuild: isDevBuild, autoUpdate: autoUpdate) }
+
+    public var changelog: [Changelog.Section] { Changelog.sections(changelogText) }
+
+    private func startAppUpdates() {
+        isDevBuild = AppUpdater.bundleURL == nil
+        canSelfInstall = AppUpdater.canInstall
+        if let url = Bundle.main.url(forResource: "CHANGELOG", withExtension: "md"),
+           let t = try? String(contentsOf: url, encoding: .utf8) { changelogText = t }
+        if let from = Preferences.pendingUpdateFrom {
+            Preferences.pendingUpdateFrom = nil
+            if CswapVersion.isOlder(from, than: AppVersion.current) { justUpdated = AppVersion.current }
+        }
+        guard !isDevBuild else { return }
+        updateLoop = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(30))   // 启动先让 cswap 那边跑起来
+            while !Task.isCancelled {
+                await self?.checkAppUpdate(manual: false)
+                try? await Task.sleep(for: .seconds(AppUpdate.checkInterval))
+            }
+        }
+    }
+
+    /// 自动检查：失败不提示（一天以上才在设置页露出来）；手动检查：失败直接写在那一栏
+    public func checkAppUpdate(manual: Bool) async {
+        switch appUpdate {
+        case .downloading, .ready, .installing: return
+        default: break
+        }
+        if manual { appUpdate = .checking }
+        do {
+            let r = try await AppUpdater.latest()
+            appCheckFailedSince = nil
+            guard let c = AppUpdate.candidate(r, current: AppVersion.current) else {
+                appUpdate = .idle
+                appUpToDate = true
+                return
+            }
+            appUpToDate = false
+            if autoUpdate && canSelfInstall {
+                await download(c, installRightAway: false)
+            } else {
+                appUpdate = .available(c)
+            }
+        } catch {
+            if manual {
+                appUpdate = .failed("查不到新版本（\(error)）")
+            } else {
+                if case .failed = appUpdate {} else { appUpdate = .idle }
+                if appCheckFailedSince == nil { appCheckFailedSince = Date() }
+            }
+        }
+    }
+
+    private func download(_ c: AppUpdate.Candidate, installRightAway: Bool) async {
+        appUpdate = .downloading(c)
+        do {
+            readyApp = try await AppUpdater.prepare(c)
+            appUpdate = .ready(c)
+            if installRightAway { installNow() } else { installIfIdle() }
+        } catch {
+            readyApp = nil
+            appUpdate = .failed("\(error)")
+        }
+    }
+
+    /// 自动更新的安装时机：面板关着、没有正在执行的命令；不满足就一分钟后再看
+    private func installIfIdle() {
+        guard autoUpdate, case .ready = appUpdate else { return }
+        guard !panelVisible, busy.isEmpty, !upgrading else {
+            installRetry?.cancel()
+            installRetry = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(60))
+                guard !Task.isCancelled else { return }
+                self?.installIfIdle()
+            }
+            return
+        }
+        installNow()
+    }
+
+    private func installNow() {
+        guard case .ready(let c) = appUpdate, let app = readyApp else { return }
+        appUpdate = .installing(c.version)
+        // 让「正在安装」先画出来再退出
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard let self else { return }
+            do {
+                try AppUpdater.install(app, version: c.version) { self.auto.shutdown() }
+            } catch {
+                self.readyApp = nil
+                self.appUpdate = .failed("\(error)")
+            }
+        }
+    }
+
+    /// 设置页「cswap App」一栏的按钮
+    public func appUpdateAction(_ a: AppUpdateRow.Action) {
+        switch a {
+        case .check, .retry: Task { await checkAppUpdate(manual: true) }
+        case .update:
+            if case .available(let c) = appUpdate { Task { await download(c, installRightAway: true) } }
+        case .installNow: installNow()
+        case .openPage:
+            var page = AppUpdate.releasesPage
+            if case .available(let c) = appUpdate, let p = c.page { page = p }
+            NSWorkspace.shared.open(page)
+        case .none, .checking: break
+        }
+    }
+
+    public func setAutoUpdate(_ on: Bool) {
+        Preferences.set(.autoUpdate, on)
+        autoUpdate = on
+        if on, canSelfInstall, case .available(let c) = appUpdate { Task { await download(c, installRightAway: false) } }
+        if on { installIfIdle() }
+    }
+
     // MARK: 截图 / 调试
 
     /// 截图工具：用给定数据，不启动任何采集
@@ -602,7 +754,8 @@ public final class PanelModel {
                                autoSwitch: AutoSwitchState = .off, cli: CLIState = .ready, fetchError: String? = nil,
                                pages: [Page] = [], history: [HistoryItem] = [], version: String? = "0.30.0",
                                latest: String? = "0.30.0", versionNote: VersionNote? = nil, toast: Toast? = nil, now: Date,
-                               forImageRenderer: Bool = true) -> PanelModel {
+                               appUpdate: AppUpdateState = .idle, autoUpdate: Bool = true, justUpdated: String? = nil,
+                               changelog: String = "", forImageRenderer: Bool = true) -> PanelModel {
         let m = PanelModel(preview: forImageRenderer)
         m.cli = cli
         m.list = list
@@ -625,6 +778,13 @@ public final class PanelModel {
         m.notifyExhausted = true
         m.notifyExpiry = true
         m.launchAtLogin = true
+        m.appUpdate = appUpdate
+        m.autoUpdate = autoUpdate
+        m.justUpdated = justUpdated
+        m.changelogText = changelog
+        m.isDevBuild = false
+        m.canSelfInstall = true
+        m.appUpToDate = appUpdate == .idle
         return m
     }
 

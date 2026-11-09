@@ -113,6 +113,13 @@ struct Toolbar: View {
             Group {
                 if let t = model.toast {
                     Text(t.text).foregroundStyle(t.level == .ok ? T.t2 : T.level(t.level))
+                } else if let v = model.justUpdated {
+                    // 新版第一次打开面板：安静的一行，关掉面板后不再出现
+                    HStack(spacing: 0) {
+                        Text("已更新到 \(v) · ").foregroundStyle(T.t2)
+                        Button { model.push(.changelog) } label: { Text("更新日志").foregroundStyle(T.accent) }
+                            .buttonStyle(.plain).handCursor()
+                    }
                 } else {
                     Text(footer.text).foregroundStyle(footer.level == .warn ? T.warn : T.t3)
                 }
@@ -125,10 +132,16 @@ struct Toolbar: View {
 
             Button { model.push(.settings) } label: {
                 Image(systemName: "gearshape").font(.system(size: 13, weight: .regular))
+                    // 有要动手的更新（关了自动更新时的新版本、更新失败）：右上角小红点
+                    .overlay(alignment: .topTrailing) {
+                        if model.settingsBadge {
+                            Circle().fill(T.bad).frame(width: 6, height: 6).offset(x: 2.5, y: -1.5)
+                        }
+                    }
             }
             .buttonStyle(IconButtonStyle())
-            .help("设置")
-            .accessibilityLabel("设置")
+            .help(model.settingsBadge ? "设置（有新版本）" : "设置")
+            .accessibilityLabel(model.settingsBadge ? "设置，有新版本" : "设置")
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
         .overlay(alignment: .top) { Rectangle().fill(T.sep).frame(height: 0.5) }

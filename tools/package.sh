@@ -2,7 +2,11 @@
 # 打包 cswap.app（只需 Command Line Tools）。用法：
 #   tools/package.sh            在仓库根目录生成 cswap.app
 #   tools/package.sh install    生成后安装到 /Applications/cswap.app（会先退出正在运行的 cswap 菜单栏）
-#   tools/package.sh release    要求工作区干净、CHANGELOG.md 有本版本一节，打 v<版本> 标签，生成 dist/cswap-<版本>.zip
+#   tools/package.sh release    发布：要求工作区干净、CHANGELOG.md 有本版本一节，打 v<版本> 标签并推送；
+#                               推送标签后由 CI（.github/workflows/release.yml）打包、签名、发 GitHub Release
+#   tools/package.sh dist       生成 dist/cswap-<版本>.zip（CI 用；App 内更新按这个文件名找安装包）
+#
+# 环境变量 CSWAP_REQUIRE_CERT=1：钥匙串里没有证书就失败，不退回临时签名（CI 必须带：临时签名的包装不上自动更新）
 #
 # 签名：钥匙串里有「cswap Code Signing」证书就用它（通知权限等随签名身份保存，固定证书重装后不丢）；
 # 没有则退回临时签名（ad-hoc）并提示。可用环境变量 CSWAP_SIGN_ID 指定别的证书名。
@@ -29,6 +33,10 @@ if [ "$MODE" = release ]; then
   else
     grep -q "^## ${VERSION} " CHANGELOG.md || { echo "✗ CHANGELOG.md 里没有 ${VERSION} 这一节"; exit 1; }
   fi
+  git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || git tag -a "${TAG}" -m "cswap ${VERSION}"
+  git push origin "${TAG}"
+  echo "已推送标签 ${TAG}：CI 会打包并发布到 GitHub Release（gh run watch 可看进度）"
+  exit 0
 fi
 swift build -c release --product cswap-app
 BIN="$(swift build -c release --show-bin-path)"
@@ -38,6 +46,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/cswap-app" "$APP/Contents/MacOS/cswap"
 # SwiftPM 资源包放进 Contents/Resources（代码里先找这里；放包根目录会破坏签名）
 cp -R "$BIN/cswap_CswapUI.bundle" "$APP/Contents/Resources/"
+# 设置页「更新日志」读它
+cp CHANGELOG.md "$APP/Contents/Resources/CHANGELOG.md"
 
 # App 图标：由 assets/claude-icon-2048-bright.png 生成各尺寸
 ICONSET="$(mktemp -d)/AppIcon.iconset"
@@ -76,6 +86,7 @@ if [[ "$(security find-identity -p codesigning 2>/dev/null)" == *"\"${SIGN_ID}\"
   codesign --force --options runtime --sign "$SIGN_ID" "$APP" >/dev/null
   SIGNED="证书「${SIGN_ID}」"
 else
+  [ "${CSWAP_REQUIRE_CERT:-}" = 1 ] && { echo "✗ 钥匙串里没有「${SIGN_ID}」证书（CSWAP_REQUIRE_CERT=1）"; exit 1; }
   codesign --force --sign - "$APP" >/dev/null
   SIGNED="临时签名（钥匙串里没有「${SIGN_ID}」；通知权限可能在每次重装后要重新允许）"
 fi
@@ -89,13 +100,12 @@ case "$MODE" in
     ditto "$APP" /Applications/cswap.app
     echo "已安装到 /Applications/cswap.app"
     open /Applications/cswap.app ;;
-  release)
+  dist)
     mkdir -p "$ROOT/dist"
     ZIP="$ROOT/dist/cswap-${VERSION}.zip"
     rm -f "$ZIP"
     ditto -c -k --keepParent "$APP" "$ZIP"
-    git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || git tag -a "${TAG}" -m "cswap ${VERSION}"
-    echo "发布包：${ZIP}（$(du -h "$ZIP" | cut -f1)），标签 ${TAG}" ;;
+    echo "安装包：${ZIP}（$(du -h "$ZIP" | cut -f1)）" ;;
   "") ;;
-  *) echo "用法：tools/package.sh [install|release]"; exit 2 ;;
+  *) echo "用法：tools/package.sh [install|release|dist]"; exit 2 ;;
 esac

@@ -22,6 +22,8 @@ public struct PanelView: View {
                 SubPage(model: model, title: "设置") { GeneralSettingsView(model: model) }.transition(.move(edge: .trailing))
             case .history?:
                 SubPage(model: model, title: "切换记录") { HistoryView(model: model) }.transition(.move(edge: .trailing))
+            case .changelog?:
+                SubPage(model: model, title: "更新日志") { ChangelogView(model: model) }.transition(.move(edge: .trailing))
             }
         }
         .frame(width: Self.width)

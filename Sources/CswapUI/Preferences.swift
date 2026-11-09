@@ -10,7 +10,7 @@ struct Preferences {
         Bundle.main.bundleIdentifier == domain ? .standard : UserDefaults(suiteName: domain) ?? .standard
 
     enum Key: String {
-        case display, refreshSeconds, notifySwitch, notifyExhausted, notifyExpiry, autoSwitch
+        case display, refreshSeconds, notifySwitch, notifyExhausted, notifyExpiry, autoSwitch, autoUpdate, pendingUpdateFrom
     }
 
     static var display: MenuBarDisplay {
@@ -29,4 +29,10 @@ struct Preferences {
     }
 
     static func set(_ k: Key, _ v: Bool) { d.set(v, forKey: k.rawValue) }
+
+    /// 刚装上的新版是从哪个版本升上来的：安装前写入，新版启动后读出并清掉（用来显示「已更新到 …」）
+    static var pendingUpdateFrom: String? {
+        get { d.string(forKey: Key.pendingUpdateFrom.rawValue) }
+        set { d.set(newValue, forKey: Key.pendingUpdateFrom.rawValue) }
+    }
 }

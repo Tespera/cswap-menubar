@@ -1,10 +1,26 @@
 # cswap
 
-**Claude Code 账号切换（搭配 Claude-cswap）**。当前版本 0.1.0，更新记录见 [CHANGELOG.md](CHANGELOG.md)。
+**Claude Code 账号切换（搭配 Claude-cswap）**。更新记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 macOS 菜单栏 App：给 Claude Code 多账号切换命令行 [claude-swap](https://github.com/realiti4/claude-swap)（`cswap`）做的原生图形界面，替换它自带的纯文字菜单栏。核心逻辑全部交给命令行，App 负责好看、好用，以及命令行不提供的部分。
 
-**当前状态（2026-11-07）**：功能清单里全部「必做」已实现并安装到 `/Applications/cswap.app`，单元测试 37 项通过；第一轮真机验收的意见已改完（见 docs/07 末节），待用户再看。
+## 截图
+
+| 主面板 | 账号详情 | 自动切换 | 设置 |
+|---|---|---|---|
+| <img src="docs/screenshots/01-now-light.png" width="200"> | <img src="docs/screenshots/10-detail-light.png" width="200"> | <img src="docs/screenshots/12-auto-light.png" width="200"> | <img src="docs/screenshots/13-settings-light.png" width="200"> |
+
+<img src="docs/screenshots/01-now-dark.png" width="240" alt="深色模式">
+
+截图里的账号是虚构的示例数据。
+
+## 安装
+
+需要 macOS 14 以上，并先装好 cswap：`uv tool install 'claude-swap[menubar]'`。
+
+1. 到 [Releases](https://github.com/Tespera/cswap-menubar/releases/latest) 下载 `cswap-<版本>.zip`，解压后把 `cswap.app` 拖进「应用程序」。
+2. App 用自签名证书签名、没有经过苹果公证，第一次打开会被拦下：到「系统设置 → 隐私与安全性」点「仍要打开」；或在终端运行 `xattr -dr com.apple.quarantine /Applications/cswap.app`。
+3. 之后的新版本由 App 自己在后台下载安装（设置里可以关掉自动更新）。
 
 ## 构建与使用
 
@@ -14,6 +30,7 @@ swift run cswap-app                 # 开发运行（菜单栏出现图标）
 swift run cswap-app --dump          # 不显示界面，打印对当前状态的理解后退出（只读）
 swift run Snapshot /tmp/cswap-shots # 各场景面板截图（浅 / 深色）+ 菜单栏图标
 tools/package.sh                    # 打包 cswap.app；加 install 安装到 /Applications 并启动
+tools/package.sh release            # 发布：打 v<版本> 标签并推送，CI 打包、签名、发 GitHub Release
 ```
 
 - 自动切换开关是 App 自己的设置：打开后 App 启动并看护 `cswap auto --json`；切换规则全部读 cswap 的 `autoswitch.*` 设置。

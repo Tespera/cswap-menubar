@@ -1,0 +1,68 @@
+# 发布：本地 tools/package.sh release 推送 v<版本> 标签 → 这里测试、打包、用固定证书签名、发 GitHub Release。
+# App 内的自动更新读 releases/latest，按文件名 cswap-<版本>.zip 找安装包，并核对签名证书与已安装的一致。
+# 需要两个仓库密钥：CSWAP_P12_BASE64（「cswap Code Signing」证书导出的 .p12，base64）、CSWAP_P12_PASSWORD
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 构建号 = 提交数
+
+      - name: 标签与版本号一致
+        run: |
+          V="$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' Sources/CswapCore/Version.swift)"
+          [ "v${V}" = "${GITHUB_REF_NAME}" ] || { echo "::error::标签 ${GITHUB_REF_NAME} 与 Version.swift 的 ${V} 不一致"; exit 1; }
+          grep -q "^## ${V} " CHANGELOG.md || { echo "::error::CHANGELOG.md 缺 ${V} 这一节"; exit 1; }
+          echo "VERSION=${V}" >> "$GITHUB_ENV"
+
+      - name: 测试
+        run: swift --version && swift test
+
+      - name: 导入签名证书
+        env:
+          P12_BASE64: ${{ secrets.CSWAP_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.CSWAP_P12_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          KP="$(uuidgen)"
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$KP" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KP" "$KC"
+          security import "$RUNNER_TEMP/signing.p12" -k "$KC" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KP" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/signing.p12"
+
+      - name: 打包
+        run: CSWAP_REQUIRE_CERT=1 tools/package.sh dist
+
+      - name: 更新说明（取 CHANGELOG.md 本版本那一节）
+        run: |
+          awk -v v="$VERSION" '
+            /^## / { if (on) exit; if (index($0, "## " v " ") == 1) { on = 1; next } }
+            on { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: 发布
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "dist/cswap-${VERSION}.zip" \
+            --title "cswap ${VERSION}" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+
+      - name: 清理钥匙串
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
