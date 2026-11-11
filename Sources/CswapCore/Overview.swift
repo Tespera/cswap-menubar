@@ -120,6 +120,10 @@ public struct Inputs: Sendable {
     /// 最近一次读取命令本身失败的原因（命令报错、超时）；成功后清空
     public var fetchError: String?
     public var nextRefreshAt: Date?
+    /// 当前账号最近一次被 Claude 用量接口限速的时刻（来自 cswap 日志）
+    public var rateLimitedAt: Date?
+    /// App 多久调一次 list（设置里的刷新频率）
+    public var readInterval: TimeInterval
     public var refreshing: Bool
     public var config: AutoSwitchConfig?
     public var priorities: [Int: Int]
@@ -128,7 +132,8 @@ public struct Inputs: Sendable {
     public var now: Date
 
     public init(cli: CLIState = .ready, list: AccountList?, listFetchedAt: Date? = nil, fetchError: String? = nil,
-                nextRefreshAt: Date? = nil, refreshing: Bool = false, config: AutoSwitchConfig? = nil,
+                nextRefreshAt: Date? = nil, rateLimitedAt: Date? = nil,
+                readInterval: TimeInterval = 60, refreshing: Bool = false, config: AutoSwitchConfig? = nil,
                 priorities: [Int: Int] = [:], autoSwitch: AutoSwitchState = .off, display: MenuBarDisplay = .both,
                 now: Date) {
         self.cli = cli
@@ -136,6 +141,8 @@ public struct Inputs: Sendable {
         self.listFetchedAt = listFetchedAt ?? now
         self.fetchError = fetchError
         self.nextRefreshAt = nextRefreshAt
+        self.rateLimitedAt = rateLimitedAt
+        self.readInterval = readInterval
         self.refreshing = refreshing
         self.config = config
         self.priorities = priorities
@@ -259,6 +266,10 @@ public struct Overview: Sendable, Equatable {
     public static let warnLine: Double = 85
     /// 登录到期提前提醒的天数
     public static let loginWarnDays = 7
+    /// cswap 正常最多约 5 分钟（含抖动）去 Claude 读一次当前账号；再加上 App 的读取间隔（刷新频率）仍没更新，算「旧了」
+    public static let normalFetchCeiling: TimeInterval = 330
+    /// 被限速后 cswap 至少一小时内放慢读取，之后逐步恢复：这段时间内数据变旧都归因于限速
+    public static let rateLimitMemory: TimeInterval = 2 * 3600
 
     public var header: Header?
     public var cards: [UsageCard]
@@ -515,6 +526,10 @@ public enum OverviewBuilder {
             return Footer(text: "读取失败\(retry)", level: .warn)
         }
         let age = (a.usageAgeSeconds ?? 0) + max(0, i.now.timeIntervalSince(i.listFetchedAt ?? i.now))
+        // 正常最多 5 分钟读一次；被限速后 cswap 放慢到 15–30 分钟，说清楚是谁慢了
+        if age >= Overview.normalFetchCeiling + i.readInterval, let hit = i.rateLimitedAt, i.now.timeIntervalSince(hit) < Overview.rateLimitMemory {
+            return Footer(text: "\(Fmt.updatedAgo(age)) · Claude 限速中", level: .off)
+        }
         return Footer(text: Fmt.updatedAgo(age), level: .off)
     }
 

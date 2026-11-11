@@ -88,11 +88,11 @@ public struct AppUpdateRow: Sendable, Equatable {
     /// - canInstall：当前 App 能自己替换（打包后的 App 且有固定证书签名）；开发运行 / 临时签名只提示、点了打开发布页
     /// - checkFailedSince：检查连续失败的起点（成功一次就清空）；不到一天不露出来
     public static func build(state: AppUpdateState, current: String, isDevBuild: Bool, canInstall: Bool,
-                             autoUpdate: Bool, upToDate: Bool = false, checkFailedSince: Date?, now: Date) -> AppUpdateRow {
+                             autoUpdate: Bool, upToDate: Bool = false, justChecked: Bool = false, checkFailedSince: Date?, now: Date) -> AppUpdateRow {
         if isDevBuild { return AppUpdateRow(subtitle: "\(current)（开发版，不自动更新）", level: .off, action: .none, spinning: false) }
         switch state {
         case .checking:
-            return AppUpdateRow(subtitle: current, level: .off, action: .checking, spinning: false)
+            return AppUpdateRow(subtitle: "\(current)，正在检查更新…", level: .off, action: .checking, spinning: false)
         case .available(let c):
             return AppUpdateRow(subtitle: "有新版本 \(c.version)", level: .ok,
                                 action: canInstall ? .update : .openPage, spinning: false)
@@ -109,7 +109,9 @@ public struct AppUpdateRow: Sendable, Equatable {
             if let since = checkFailedSince, now.timeIntervalSince(since) >= AppUpdate.quietFailureWindow {
                 return AppUpdateRow(subtitle: "\(current)，检查更新失败", level: .warn, action: .retry, spinning: false)
             }
-            return AppUpdateRow(subtitle: upToDate ? "\(current)，已是最新" : current, level: .off, action: .check, spinning: false)
+            // 手动检查过（本次打开面板内）：文字要和检查前不一样，用户才知道真的查过了
+            let text = upToDate ? (justChecked ? "\(current)，已是最新 · 刚刚检查" : "\(current)，已是最新") : current
+            return AppUpdateRow(subtitle: text, level: .off, action: .check, spinning: false)
         }
     }
 
@@ -164,6 +166,14 @@ public enum Changelog {
     /// 某一版那一节（App 里的更新日志页只显示当前版本，其余到 GitHub 发布页看）
     public static func section(_ text: String, version: String) -> Section? {
         sections(text).first { $0.version == version }
+    }
+
+    /// 一节里各条的加粗标题（「- **标题**：说明」），用于更新通知的正文
+    public static func highlights(_ s: Section) -> [String] {
+        s.body.split(separator: "\n").compactMap { line in
+            guard let m = try? /^\s*-\s+\*\*(.+?)\*\*/.firstMatch(in: String(line)) else { return nil }
+            return String(m.1)
+        }
     }
 
     /// from 为 nil 时只取 to 这一版

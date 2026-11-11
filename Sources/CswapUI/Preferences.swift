@@ -10,7 +10,7 @@ struct Preferences {
         Bundle.main.bundleIdentifier == domain ? .standard : UserDefaults(suiteName: domain) ?? .standard
 
     enum Key: String {
-        case display, refreshSeconds, notifySwitch, notifyExhausted, notifyExpiry, autoSwitch, autoUpdate, pendingUpdateFrom
+        case display, refreshSeconds, notifySwitch, notifyExhausted, notifyExpiry, notifyUpdate, autoSwitch, autoUpdate, pendingUpdateFrom, pendingUpdateWasAuto
     }
 
     static var display: MenuBarDisplay {

@@ -226,15 +226,15 @@ enum HistoryStore {
     }
 
     /// cswap 日志（只读，不是稳定接口：读不到就只用 App 自己的记录）
-    static func readLog() -> [LogSwitch] {
+    static func readLogText() -> String {
         let path = NSHomeDirectory() + "/.claude-swap-backup/claude-swap.log"
-        guard let h = FileHandle(forReadingAtPath: path) else { return [] }
+        guard let h = FileHandle(forReadingAtPath: path) else { return "" }
         defer { try? h.close() }
         // 只读末尾 512KB：日志会一直长
         let size = (try? h.seekToEnd()) ?? 0
         try? h.seek(toOffset: size > 512_000 ? size - 512_000 : 0)
         let data = (try? h.readToEnd()) ?? Data()
-        return SwitchLog.parse(String(decoding: data, as: UTF8.self))
+        return String(decoding: data, as: UTF8.self)
     }
 }
 

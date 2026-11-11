@@ -70,6 +70,21 @@ public enum SwitchLog {
         }
     }
 
+    /// 某个账号最近一次被 Claude 的用量接口限速（`Usage fetch failed for account N: http-429`）的时刻。
+    /// 限速后 cswap 会把读取间隔逐步拉长到最多 30 分钟，用来解释「数据为什么旧了」
+    public static func lastRateLimited(_ text: String, account: Int, timeZone: TimeZone = Fmt.machineTimeZone) -> Date? {
+        let re = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:[,.]\d+)?\s.*Usage fetch failed for account (\d+): http-429/
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = timeZone
+        for line in text.split(whereSeparator: \.isNewline).reversed() {
+            guard let m = try? re.firstMatch(in: String(line)), Int(m.7) == account else { continue }
+            let dc = DateComponents(year: Int(m.1), month: Int(m.2), day: Int(m.3),
+                                    hour: Int(m.4), minute: Int(m.5), second: Int(m.6))
+            return cal.date(from: dc)
+        }
+        return nil
+    }
+
     /// 日志与 App 记录合并：同一次切换（目标相同、时间差 ≤ 15 秒）取 App 的来源；
     /// 只有 App 记录（日志读不到）的也展示。按时间倒序取前 limit 条
     public static func merge(log: [LogSwitch], records: [HistoryRecord], names: [Int: String],
@@ -145,6 +160,13 @@ public enum Notices {
         let days = Int((left / 86400).rounded(.up))
         let title = left <= 0 ? "\(name) 的登录已过期" : "\(name) 的登录 \(days) 天后过期"
         return Notice(title: title, body: "到期前用这个号在 Claude Code 里重新登录一次")
+    }
+
+    /// F5 App 自动更新后：正文列这一版的要点（更新日志各条的标题），取不到时指向更新日志
+    public static func appUpdated(to version: String, changelog: Changelog.Section?) -> Notice {
+        let points = changelog.map(Changelog.highlights) ?? []
+        return Notice(title: "cswap 已更新到 \(version)",
+                      body: points.isEmpty ? "在面板底部点「更新日志」查看新变化" : points.joined(separator: "；"))
     }
 
     /// F4 账号令牌失效被隔离

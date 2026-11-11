@@ -173,6 +173,8 @@ struct GeneralSettingsView: View {
             SettingRow(title: "登录快过期时", subtitle: "提前 7 天提醒") {
                 Switch(isOn: model.notifyExpiry) { model.setNotify(.notifyExpiry, $0) }
             }
+            RowSeparator()
+            SettingRow(title: "App 自动更新后") { Switch(isOn: model.notifyUpdate) { model.setNotify(.notifyUpdate, $0) } }
         }
 
         GroupTitle(text: "通用")

@@ -186,6 +186,33 @@ struct OverviewTests {
         #expect(OverviewBuilder.displayName(account(4, alias: "loria")) == "loria")
     }
 
+    @Test func footerExplainsRateLimit() {
+        var a = account(1, active: true)
+        a.usageAgeSeconds = 11 * 60
+        let l = list(a)
+        let hit = fixtureNow.addingTimeInterval(-40 * 60)
+        #expect(OverviewBuilder.build(Inputs(list: l, rateLimitedAt: hit, now: fixtureNow)).footer.text == "11 分钟前更新 · Claude 限速中")
+        // 没被限速、限速已是很久以前、数据还新：都只显示更新时间
+        #expect(OverviewBuilder.build(Inputs(list: l, now: fixtureNow)).footer.text == "11 分钟前更新")
+        #expect(OverviewBuilder.build(Inputs(list: l, rateLimitedAt: fixtureNow.addingTimeInterval(-3 * 3600), now: fixtureNow)).footer.text == "11 分钟前更新")
+        a.usageAgeSeconds = 3 * 60
+        #expect(OverviewBuilder.build(Inputs(list: list(a), rateLimitedAt: hit, now: fixtureNow)).footer.text == "3 分钟前更新")
+    }
+
+    @Test func rateLimitFromLog() {
+        let log = """
+        2026-11-11 14:54:02,981 - WARNING - Usage fetch failed for account 2: http-429, retry-after 0s (usage-endpoint budget reached; backing off)
+        2026-11-11 14:59:18,620 - WARNING - Usage fetch failed for account 2: http-429, retry-after 0s (usage-endpoint budget reached; backing off)
+        2026-11-11 15:10:00,000 - WARNING - Usage fetch failed for account 1: http-429, retry-after 0s
+        2026-11-11 15:12:00,000 - WARNING - Usage fetch failed for account 2: timeout
+        """
+        let tz = TimeZone(identifier: "Asia/Shanghai")!
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = tz
+        let at = SwitchLog.lastRateLimited(log, account: 2, timeZone: tz)
+        #expect(at == cal.date(from: DateComponents(year: 2026, month: 11, day: 11, hour: 14, minute: 59, second: 18)))
+        #expect(SwitchLog.lastRateLimited(log, account: 3, timeZone: tz) == nil)
+    }
+
     @Test func footerAndBlockers() {
         let l = list(account(1, active: true))
         let next = fixtureNow.addingTimeInterval(90)
@@ -275,6 +302,22 @@ struct HistoryNoticeTests {
             HistoryItem(title: "换到 Loria", source: "自动", time: "今天 06:00"),
             HistoryItem(title: "换到 账号 1", source: "命令行", time: "昨天 09:53"),
         ])
+    }
+
+    @Test func appUpdatedNotice() {
+        let text = """
+        ## 0.5.0 — 2026-11-11
+
+        - **说清楚用量为什么没更新**：被限速时底部注明
+        - **去掉「刷新频率」设置**：它管不了数据多新
+
+        ## 0.4.0 — 2026-11-10
+
+        - **旧的一条**：不该出现
+        """
+        let n = Notices.appUpdated(to: "0.5.0", changelog: Changelog.section(text, version: "0.5.0"))
+        #expect(n == Notices.Notice(title: "cswap 已更新到 0.5.0", body: "说清楚用量为什么没更新；去掉「刷新频率」设置"))
+        #expect(Notices.appUpdated(to: "0.5.0", changelog: nil).body == "在面板底部点「更新日志」查看新变化")
     }
 
     @Test func notices() throws {

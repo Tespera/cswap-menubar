@@ -41,15 +41,16 @@ struct AppUpdateTests {
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 
     func row(_ s: AppUpdateState, auto: Bool = true, dev: Bool = false, canInstall: Bool = true,
-             upToDate: Bool = false, failedSince: Date? = nil) -> AppUpdateRow {
+             upToDate: Bool = false, justChecked: Bool = false, failedSince: Date? = nil) -> AppUpdateRow {
         AppUpdateRow.build(state: s, current: "0.2.0", isDevBuild: dev, canInstall: canInstall, autoUpdate: auto,
-                           upToDate: upToDate, checkFailedSince: failedSince, now: now)
+                           upToDate: upToDate, justChecked: justChecked, checkFailedSince: failedSince, now: now)
     }
 
     @Test func rowStates() {
         #expect(row(.idle).subtitle == "0.2.0" && row(.idle).action == .check)
         #expect(row(.idle, upToDate: true).subtitle == "0.2.0，已是最新")
-        #expect(row(.checking).action == .checking)
+        #expect(row(.checking).action == .checking && row(.checking).subtitle == "0.2.0，正在检查更新…")
+        #expect(row(.idle, upToDate: true, justChecked: true).subtitle == "0.2.0，已是最新 · 刚刚检查")
         #expect(row(.available(c), auto: false) == AppUpdateRow(subtitle: "有新版本 0.3.0", level: .ok, action: .update, spinning: false))
         #expect(row(.available(c), canInstall: false).action == .openPage)
         #expect(row(.downloading(c)).spinning)

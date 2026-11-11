@@ -34,6 +34,8 @@ public final class PanelModel {
     public private(set) var fetchError: String?
     public private(set) var refreshing = false
     private var nextRefreshAt: Date?
+    /// 当前账号最近一次被 Claude 用量接口限速的时刻（读 cswap 日志）
+    private var rateLimitedAt: Date?
     public private(set) var config: AutoSwitchConfig?
     /// 优先级（解析 `cswap priority` 文字输出）；nil = 读不到，详情页隐藏当前值
     public private(set) var priorities: [Int: Int]?
@@ -54,6 +56,9 @@ public final class PanelModel {
     }
     public private(set) var upgrading = false
     public private(set) var checkingUpdate = false
+    /// 本次打开面板内手动检查过（命令行 / App）：副标题加「· 刚刚检查」，关面板后清掉
+    public private(set) var cliJustChecked = false
+    public private(set) var appJustChecked = false
     public private(set) var now = Date()
 
     // MARK: App 自己的更新
@@ -91,6 +96,7 @@ public final class PanelModel {
     public private(set) var notifySwitch = Preferences.flag(.notifySwitch, default: true)
     public private(set) var notifyExhausted = Preferences.flag(.notifyExhausted, default: true)
     public private(set) var notifyExpiry = Preferences.flag(.notifyExpiry, default: true)
+    public private(set) var notifyUpdate = Preferences.flag(.notifyUpdate, default: true)
     public private(set) var autoEnabled = Preferences.flag(.autoSwitch, default: false)
     public private(set) var launchAtLogin = LaunchAgent.isInstalled
     /// 系统设置里关掉了 cswap 的通知：设置页「通知」组顶部显示「通知未开启 · 去开启」
@@ -124,7 +130,8 @@ public final class PanelModel {
 
     public var overview: Overview {
         OverviewBuilder.build(Inputs(cli: cli, list: list, listFetchedAt: listFetchedAt, fetchError: fetchError,
-                                     nextRefreshAt: nextRefreshAt, refreshing: refreshing, config: config,
+                                     nextRefreshAt: nextRefreshAt, rateLimitedAt: rateLimitedAt,
+                                     readInterval: TimeInterval(refreshSeconds), refreshing: refreshing, config: config,
                                      priorities: priorities ?? [:], autoSwitch: autoSwitch, display: display, now: now))
     }
 
@@ -145,6 +152,7 @@ public final class PanelModel {
 
     public var versionText: String {
         guard let v = cswapVersion else { return cli == .missing ? "没找到" : "读取中" }
+        if checkingUpdate { return "\(v)，正在检查更新…" }
         switch versionNote {
         case .upgrade(let r) where r != .upToDate: return r.blockedNote ?? r.message
         case .failed(let why): return "\(v)，\(why)"
@@ -152,7 +160,7 @@ public final class PanelModel {
         }
         if CswapVersion.isOlder(v, than: CswapVersion.minimum) { return "\(v)，低于 \(CswapVersion.minimum)，建议升级" }
         if let l = latestVersion, CswapVersion.isOlder(v, than: l) { return "\(v)，可升级到 \(l)" }
-        if latestVersion != nil { return "\(v)，已是最新" }
+        if latestVersion != nil { return cliJustChecked ? "\(v)，已是最新 · 刚刚检查" : "\(v)，已是最新" }
         return v
     }
 
@@ -270,6 +278,8 @@ public final class PanelModel {
         panelVisible = false
         pages.removeAll()
         if justUpdatedShown { justUpdated = nil }
+        cliJustChecked = false
+        appJustChecked = false
         installIfIdle()
     }
 
@@ -301,9 +311,12 @@ public final class PanelModel {
         change(&list!.accounts[k])
     }
 
+    /// 每次读完 list 顺带读一次 cswap 日志：切换记录 + 当前账号是否被限速
     private func reloadHistory() {
         let names = Dictionary((list?.accounts ?? []).map { ($0.number, OverviewBuilder.displayName($0)) }, uniquingKeysWith: { a, _ in a })
-        history = SwitchLog.merge(log: HistoryStore.readLog(), records: appRecords, names: names, now: Date())
+        let log = HistoryStore.readLogText()
+        history = SwitchLog.merge(log: SwitchLog.parse(log), records: appRecords, names: names, now: Date())
+        rateLimitedAt = list?.activeAccountNumber.flatMap { SwitchLog.lastRateLimited(log, account: $0) }
     }
 
     // MARK: 导航
@@ -542,6 +555,7 @@ public final class PanelModel {
         case .notifySwitch: notifySwitch = on
         case .notifyExhausted: notifyExhausted = on
         case .notifyExpiry: notifyExpiry = on
+        case .notifyUpdate: notifyUpdate = on
         default: break
         }
     }
@@ -553,12 +567,18 @@ public final class PanelModel {
 
     public func checkUpdate() {
         checkingUpdate = true
+        cliJustChecked = false
         versionNote = nil
         Task {
             await loadVersion()
-            latestVersion = await UpdateCheck.pypi() ?? latestVersion
+            let found = await UpdateCheck.pypi()
+            latestVersion = found ?? latestVersion
             checkingUpdate = false
-            if latestVersion == nil { versionNote = .failed("查不到最新版本（网络不通？）") }
+            if found == nil {
+                versionNote = .failed("检查更新失败（网络不通？）")
+            } else {
+                cliJustChecked = true
+            }
         }
     }
 
@@ -627,7 +647,7 @@ public final class PanelModel {
 
     public var appUpdateRow: AppUpdateRow {
         AppUpdateRow.build(state: appUpdate, current: AppVersion.current, isDevBuild: isDevBuild, canInstall: canSelfInstall,
-                           autoUpdate: autoUpdate, upToDate: appUpToDate, checkFailedSince: appCheckFailedSince, now: now)
+                           autoUpdate: autoUpdate, upToDate: appUpToDate, justChecked: appJustChecked, checkFailedSince: appCheckFailedSince, now: now)
     }
 
     /// 齿轮上的小红点
@@ -647,7 +667,13 @@ public final class PanelModel {
            let t = try? String(contentsOf: url, encoding: .utf8) { changelogText = t }
         if let from = Preferences.pendingUpdateFrom {
             Preferences.pendingUpdateFrom = nil
-            if CswapVersion.isOlder(from, than: AppVersion.current) { justUpdated = AppVersion.current }
+            // 用户自己点「更新」时人就在面板前，不再通知；后台自动装的才发
+            let wasAuto = Preferences.flag(.pendingUpdateWasAuto, default: false)
+            Preferences.set(.pendingUpdateWasAuto, false)
+            if CswapVersion.isOlder(from, than: AppVersion.current) {
+                justUpdated = AppVersion.current
+                if wasAuto, notifyUpdate { notifier.post(Notices.appUpdated(to: AppVersion.current, changelog: changelog)) }
+            }
         }
         guard !isDevBuild else { return }
         // 上次更新留下的下载与解压文件
@@ -667,13 +693,14 @@ public final class PanelModel {
         case .downloading, .ready, .installing: return
         default: break
         }
-        if manual { appUpdate = .checking }
+        if manual { appUpdate = .checking; appJustChecked = false }
         do {
             let m = try await AppUpdater.latest()
             appCheckFailedSince = nil
             guard let c = AppUpdate.candidate(m, current: AppVersion.current) else {
                 appUpdate = .idle
                 appUpToDate = true
+                if manual { appJustChecked = true }
                 return
             }
             appUpToDate = false
@@ -716,11 +743,12 @@ public final class PanelModel {
             }
             return
         }
-        installNow()
+        installNow(automatic: true)
     }
 
-    private func installNow() {
+    private func installNow(automatic: Bool = false) {
         guard case .ready(let c) = appUpdate, let app = readyApp else { return }
+        Preferences.set(.pendingUpdateWasAuto, automatic)
         appUpdate = .installing(c.version)
         // 让「正在安装」先画出来再退出
         Task { [weak self] in
@@ -788,6 +816,7 @@ public final class PanelModel {
         m.notifySwitch = true
         m.notifyExhausted = true
         m.notifyExpiry = true
+        m.notifyUpdate = true
         m.launchAtLogin = true
         m.notificationsOff = notificationsOff
         m.appUpdate = appUpdate

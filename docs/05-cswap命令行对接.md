@@ -59,6 +59,8 @@ Used only by: cswap auto --strategy priority-consume-first
 ### 切换日志
 `~/.claude-swap-backup/claude-swap.log`，行格式 `2026-11-06 09:53:23,726 - INFO - Switched from account 2 to 1`。**不区分手动 / 自动**。上游菜单栏用正则 `Switched from account (\d+) to (\d+)` 解析，同样做法。
 
+同一日志里 `Usage fetch failed for account N: http-429, ...` 表示 Claude 用量接口限速（每账号约 30 次/小时）。之后 cswap 把该账号读取间隔从 3–5 分钟逐步放大到最多 30 分钟（上游 `poll_policy.py`，没有强制读取的参数）。App 取当前账号最近一次 429，数据超过「5.5 分钟 + 刷新频率」没更新时在底部注明「Claude 限速中」。
+
 ## 2. 写
 
 | 操作 | 命令 | 备注 |
