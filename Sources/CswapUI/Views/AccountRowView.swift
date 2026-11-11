@@ -64,10 +64,11 @@ struct AccountRowView: View {
         Group {
             switch row.meta {
             case .usage(let bars):
-                HStack(spacing: 10) { ForEach(bars, id: \.kind.label) { MiniBarView(bar: $0) } }
+                HStack(alignment: .top, spacing: 10) { ForEach(bars, id: \.kind.label) { MiniBarView(bar: $0) } }
             case .disabled(let bar):
-                HStack(spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
                     Text("不参与自动切换").foregroundStyle(T.t2)
+                        .frame(width: MiniBarView.width, alignment: .leading)  // 本周列与其他行对齐
                     if let bar { MiniBarView(bar: bar) }
                 }
             case .broken(let text):

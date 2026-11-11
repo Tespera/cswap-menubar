@@ -93,6 +93,8 @@ public final class PanelModel {
     public private(set) var notifyExpiry = Preferences.flag(.notifyExpiry, default: true)
     public private(set) var autoEnabled = Preferences.flag(.autoSwitch, default: false)
     public private(set) var launchAtLogin = LaunchAgent.isInstalled
+    /// 系统设置里关掉了 cswap 的通知：设置页「通知」组顶部显示「通知未开启 · 去开启」
+    public private(set) var notificationsOff = false
     public private(set) var autoUpdate = Preferences.flag(.autoUpdate, default: true)
 
     // MARK: 服务
@@ -183,6 +185,7 @@ public final class PanelModel {
         appRecords = HistoryStore.load()
         auto.onEvent = { [weak self] e in self?.handle(e) }
         auto.onState = { [weak self] s in self?.autoSwitch = s }
+        notifier.onChange = { [weak self] p in self?.notificationsOff = p == .denied }
         notifier.requestAuthorization()
         clock = Task { [weak self] in
             while !Task.isCancelled {
@@ -257,6 +260,7 @@ public final class PanelModel {
 
     public func panelDidShow() {
         panelVisible = true
+        notifier.refresh()
         if justUpdated != nil { justUpdatedShown = true }
         now = Date()
         if Date().timeIntervalSince(listFetchedAt ?? .distantPast) > 5 { Task { await refresh() } }
@@ -633,6 +637,7 @@ public final class PanelModel {
     public var changelog: Changelog.Section? { Changelog.section(changelogText, version: AppVersion.current) }
 
     /// 全部更新记录在 GitHub 发布页
+    public func openNotificationSettings() { Notifier.openSystemSettings() }
     public func openReleasesPage() { NSWorkspace.shared.open(AppUpdate.releasesPage) }
 
     private func startAppUpdates() {
@@ -760,7 +765,8 @@ public final class PanelModel {
                                pages: [Page] = [], history: [HistoryItem] = [], version: String? = "0.30.0",
                                latest: String? = "0.30.0", versionNote: VersionNote? = nil, toast: Toast? = nil, now: Date,
                                appUpdate: AppUpdateState = .idle, autoUpdate: Bool = true, justUpdated: String? = nil,
-                               changelog: String = "", forImageRenderer: Bool = true) -> PanelModel {
+                               changelog: String = "", notificationsOff: Bool = false,
+                               forImageRenderer: Bool = true) -> PanelModel {
         let m = PanelModel(preview: forImageRenderer)
         m.cli = cli
         m.list = list
@@ -783,6 +789,7 @@ public final class PanelModel {
         m.notifyExhausted = true
         m.notifyExpiry = true
         m.launchAtLogin = true
+        m.notificationsOff = notificationsOff
         m.appUpdate = appUpdate
         m.autoUpdate = autoUpdate
         m.justUpdated = justUpdated

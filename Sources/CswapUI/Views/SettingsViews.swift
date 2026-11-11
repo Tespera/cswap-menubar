@@ -160,6 +160,12 @@ struct GeneralSettingsView: View {
 
         GroupTitle(text: "通知")
         GroupBox {
+            if model.notificationsOff {
+                SettingRow(title: "通知未开启", subtitle: "开启后才能收到下面这些提醒") {
+                    Button("去开启") { model.openNotificationSettings() }.buttonStyle(SmallButtonStyle(kind: .primary))
+                }
+                RowSeparator()
+            }
             SettingRow(title: "自动换号后") { Switch(isOn: model.notifySwitch) { model.setNotify(.notifySwitch, $0) } }
             RowSeparator()
             SettingRow(title: "所有账号都用完时") { Switch(isOn: model.notifyExhausted) { model.setNotify(.notifyExhausted, $0) } }

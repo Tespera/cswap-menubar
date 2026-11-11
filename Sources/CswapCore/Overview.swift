@@ -176,6 +176,16 @@ public struct MiniBar: Sendable, Equatable {
     public var tint: BarTint
     /// 「5 小时 0%」
     public var text: String
+    /// 条下面的刷新时间：「2 时 14 分后刷新」「周三 05:00 刷新」「还没开始用」
+    public var foot: String
+
+    public init(kind: WindowKind, pct: Double?, tint: BarTint, text: String, foot: String) {
+        self.kind = kind
+        self.pct = pct
+        self.tint = tint
+        self.text = text
+        self.foot = foot
+    }
 }
 
 public enum RowMeta: Sendable, Equatable {
@@ -280,7 +290,7 @@ public enum OverviewBuilder {
         // 当前账号排最前，其余按编号
         let rows = (list?.accounts ?? [])
             .sorted { ($0.number == active?.number ? 0 : 1, $0.number) < ($1.number == active?.number ? 0 : 1, $1.number) }
-            .map { row($0, activeNumber: active?.number) }
+            .map { row($0, activeNumber: active?.number, now: i.now) }
 
         var blocker: Overview.Blocker?
         switch i.cli {
@@ -349,17 +359,21 @@ public enum OverviewBuilder {
         var out: [UsageCard] = []
         // 没有 5 小时窗口（如 Ultra）时整卡隐藏
         if let w = u.fiveHour {
-            let foot: String
-            if (w.pct ?? 0) == 0 && w.resetsAt == nil { foot = "还没开始用" }
-            else { foot = Fmt.refresh(w.resetsAt, now: now) ?? "—" }
-            out.append(UsageCard(kind: .fiveHour, value: Fmt.pct(w.pct), pct: w.pct, tint: .of(w.pct), pace: nil, foot: foot))
+            out.append(UsageCard(kind: .fiveHour, value: Fmt.pct(w.pct), pct: w.pct, tint: .of(w.pct), pace: nil,
+                                 foot: refreshFoot(w, now: now)))
         }
         if let w = u.sevenDay {
             out.append(UsageCard(kind: .week, value: Fmt.pct(w.pct), pct: w.pct, tint: .of(w.pct), pace: w.expectedPct,
-                                 foot: Fmt.refresh(w.resetsAt, now: now) ?? "—",
+                                 foot: refreshFoot(w, now: now),
                                  exhaustion: liveUsage(a).flatMap { _ in runsOutBeforeReset(w, now: now) }.map { Fmt.exhaustion($0, now: now) }))
         }
         return out
+    }
+
+    /// 用量卡与账号行共用的刷新说明：没用过且没有刷新时间 →「还没开始用」
+    static func refreshFoot(_ w: UsageWindow, now: Date) -> String {
+        if (w.pct ?? 0) == 0 && w.resetsAt == nil { return "还没开始用" }
+        return Fmt.refresh(w.resetsAt, now: now) ?? "—"
     }
 
     /// 按当前速度本周额度会在刷新前用完：返回预计用完的时间，否则 nil。
@@ -380,7 +394,7 @@ public enum OverviewBuilder {
 
     // MARK: 账号列表
 
-    public static func row(_ a: Account, activeNumber: Int?) -> AccountRow {
+    public static func row(_ a: Account, activeNumber: Int?, now: Date) -> AccountRow {
         let isCurrent = a.number == activeNumber
         let broken = a.usageStatus?.isLoginBroken == true
         let disabled = a.disabled == true
@@ -389,7 +403,8 @@ public enum OverviewBuilder {
 
         func mini(_ kind: WindowKind, _ w: UsageWindow?) -> MiniBar? {
             guard let w else { return nil }
-            return MiniBar(kind: kind, pct: w.pct, tint: .of(w.pct), text: "\(kind.label) \(Fmt.pct(w.pct))%")
+            return MiniBar(kind: kind, pct: w.pct, tint: .of(w.pct), text: "\(kind.label) \(Fmt.pct(w.pct))%",
+                           foot: refreshFoot(w, now: now))
         }
 
         let meta: RowMeta
@@ -556,7 +571,7 @@ public struct AccountDetail: Sendable, Equatable {
         }
         let thresholdText = a.threshold.map { "\(Fmt.pct($0))%" } ?? "跟随全局 \(Fmt.pct(cfg.threshold))%"
         return AccountDetail(
-            row: OverviewBuilder.row(a, activeNumber: activeNumber),
+            row: OverviewBuilder.row(a, activeNumber: activeNumber, now: now),
             cards: a.usageStatus?.isLoginBroken == true ? [] : OverviewBuilder.cards(for: a, now: now),
             loginExpiry: a.loginExpiresAt.map { Fmt.monthDay($0) } ?? "—",
             tokenStatus: token,

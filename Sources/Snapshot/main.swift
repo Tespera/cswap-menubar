@@ -75,6 +75,14 @@ let history = [
     HistoryItem(title: "换到 alicechen92", source: "命令行", time: "11-05 11:08"),
 ]
 
+let showcaseHistory = [
+    HistoryItem(title: "换到 工作号", source: "自动", time: "今天 06:12"),
+    HistoryItem(title: "换到 备用 Max", source: "面板", time: "昨天 22:40"),
+    HistoryItem(title: "换到 工作号", source: "命令行", time: "昨天 09:53"),
+    HistoryItem(title: "换到 团队席位", source: "自动", time: "昨天 07:50"),
+    HistoryItem(title: "换到 工作号", source: "面板", time: "11-05 11:08"),
+]
+
 var customConfig = AutoSwitchConfig(threshold: 90, weeklyThreshold: 97, cooldownSeconds: 300, strategy: .best)
 customConfig.model = nil
 
@@ -126,6 +134,12 @@ let scenarios: [Scenario] = [
     .init(name: "15e-settings-failed") {
         .preview(list: realList, pages: [.settings], now: now, appUpdate: .failed("安装包签名不对，已丢弃"))
     },
+    // README 展示图用：各子页统一用 tiersList 这组示例账号（tools/readme-art 拼图）
+    .init(name: "20-showcase-detail") { .preview(list: tiersList, priorities: [1: 0, 2: 1], pages: [.detail(2)], now: now) },
+    .init(name: "21-showcase-auto") { .preview(list: tiersList, config: customConfig, autoSwitch: .running, pages: [.autoSwitch], now: now) },
+    .init(name: "22-showcase-history") { .preview(list: tiersList, pages: [.history], history: showcaseHistory, now: now) },
+    .init(name: "23-showcase-settings") { .preview(list: tiersList, pages: [.settings], version: "1.0.0", latest: "1.0.0", now: now) },
+    .init(name: "13d-settings-notifications-off") { .preview(list: realList, pages: [.settings], now: now, notificationsOff: true) },
     .init(name: "16-changelog") { .preview(list: realList, pages: [.changelog], now: now, changelog: changelogText) },
 ]
 

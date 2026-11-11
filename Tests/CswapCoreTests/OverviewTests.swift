@@ -89,8 +89,12 @@ struct OverviewTests {
         #expect(o.rows.count == 2)
         #expect(o.rows[0].isCurrent && o.rows[0].action == nil && o.rows[0].avatar == .color)
         #expect(o.rows[1].action == .switchTo && o.rows[1].avatar == .idle)
-        #expect(o.rows[1].meta == .usage([MiniBar(kind: .fiveHour, pct: 0, tint: .native, text: "5 小时 0%"),
-                                           MiniBar(kind: .week, pct: 64, tint: .native, text: "本周 64%")]))
+        guard case .usage(let bars) = o.rows[1].meta else { Issue.record("应为用量条"); return }
+        #expect(bars.map(\.text) == ["5 小时 0%", "本周 64%"])
+        #expect(bars.map(\.tint) == [.native, .native])
+        // 每列下面带刷新时间（周几随本机时区，只核对写法）
+        #expect(bars[0].foot == "还没开始用")
+        #expect(bars[1].foot.hasSuffix(" 刷新") && bars[1].foot.hasPrefix("周"))
         // 已经 90%，等于全局阈值：不再预告（到线了）
         #expect(o.autoRow.subtitle == "用到 90% 时换到余量最多的号")
         #expect(o.menuBar.items == [MenuBarItem(kind: .fiveHour, text: "90%", level: .warn),
@@ -108,15 +112,15 @@ struct OverviewTests {
     }
 
     @Test func rowsForSpecialAccounts() {
-        let broken = OverviewBuilder.row(account(2, status: .reloginRequired), activeNumber: 1)
+        let broken = OverviewBuilder.row(account(2, status: .reloginRequired), activeNumber: 1, now: fixtureNow)
         #expect(broken.meta == .broken("登录已失效，在终端重新登录后点刷新"))
         #expect(broken.action == .relogin && broken.avatar == .muted)
-        let off = OverviewBuilder.row(account(3, disabled: true), activeNumber: 1)
+        let off = OverviewBuilder.row(account(3, disabled: true), activeNumber: 1, now: fixtureNow)
         #expect(off.isDisabled && off.avatar == .muted)
         if case .disabled(let bar) = off.meta { #expect(bar?.kind == .week) } else { Issue.record("应为不参与自动切换") }
-        let unread = OverviewBuilder.row(Account(number: 4, email: "x@y", usage: nil, usageError: "http-429"), activeNumber: 1)
+        let unread = OverviewBuilder.row(Account(number: 4, email: "x@y", usage: nil, usageError: "http-429"), activeNumber: 1, now: fixtureNow)
         #expect(unread.meta == .note("用量读取失败（http-429）"))
-        #expect(OverviewBuilder.row(account(5, alias: "备用号"), activeNumber: 1).name == "备用号")
+        #expect(OverviewBuilder.row(account(5, alias: "备用号"), activeNumber: 1, now: fixtureNow).name == "备用号")
     }
 
     @Test func previewBeforeThreshold() {

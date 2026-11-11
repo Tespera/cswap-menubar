@@ -49,12 +49,13 @@ cp -R "$BIN/cswap_CswapUI.bundle" "$APP/Contents/Resources/"
 # 设置页「更新日志」读它
 cp CHANGELOG.md "$APP/Contents/Resources/CHANGELOG.md"
 
-# App 图标：由 assets/claude-icon-2048-bright.png 生成各尺寸
+# App 图标：由 assets/AppIcon.png（1024 母版，按 Apple 图标规范：824 超椭圆主体 + 留白 + 投影）生成各尺寸。
+# 母版由 tools/make-icon.py 生成；不要再直接用满版正方形的 claude-icon-2048-bright.png（会显示成方块）
 ICONSET="$(mktemp -d)/AppIcon.iconset"
 mkdir -p "$ICONSET"
 for s in 16 32 128 256 512; do
-  sips -z $s $s assets/claude-icon-2048-bright.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
-  sips -z $((s * 2)) $((s * 2)) assets/claude-icon-2048-bright.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+  sips -z $s $s assets/AppIcon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+  sips -z $((s * 2)) $((s * 2)) assets/AppIcon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 rm -rf "$(dirname "$ICONSET")"

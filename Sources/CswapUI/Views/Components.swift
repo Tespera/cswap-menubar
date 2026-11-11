@@ -207,13 +207,20 @@ struct UsageCards: View {
 }
 
 /// 账号行里的迷你条：30pt 宽的细条 + 「5 小时 0%」
+/// 账号行里的一列：上「▬ 5 小时 30%」，下刷新时间。
+/// 定宽（够放「23 时 59 分后刷新」），各行的第二列才能上下对齐
 struct MiniBarView: View {
     let bar: MiniBar
+    static let width: CGFloat = 92
     var body: some View {
-        HStack(spacing: 4) {
-            UsageBar(pct: bar.pct, tint: bar.tint, kind: bar.kind, height: 3).frame(width: 24)
-            Text(bar.text).font(F.num(10, .medium)).foregroundStyle(T.t2).fixedSize()
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                UsageBar(pct: bar.pct, tint: bar.tint, kind: bar.kind, height: 3).frame(width: 24)
+                Text(bar.text).font(F.num(10, .medium)).foregroundStyle(T.t2).fixedSize()
+            }
+            Text(bar.foot).font(F.num(9.5)).foregroundStyle(T.t3).fixedSize()
         }
+        .frame(minWidth: Self.width, alignment: .leading)
     }
 }
 

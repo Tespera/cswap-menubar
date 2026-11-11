@@ -5,42 +5,91 @@ import UserNotifications
 
 // MARK: - 通知
 
-/// 系统通知：打包成 .app 时用 UNUserNotificationCenter；不在 App 包里（swift run）、
-/// 或通知权限被拒 / 请求出错时退回 osascript（docs/04 §2，自签名包能否稳定弹 UN 通知待真机确认）
+/// 系统通知。打包成 .app 时只用 App 自己的身份（UNUserNotificationCenter）发：
+/// 用户在系统设置里关掉了 cswap 的通知就不发，设置页显示「通知未开启」引导去打开。
+/// 以前权限被拒时退回 osascript，通知的图标和署名变成「脚本编辑器」，而且用户察觉不到权限是关的（用户 2026-11-11）。
+/// 只有不在 App 包里（swift run 开发运行）才用 osascript，否则开发时看不到通知。
 @MainActor
 final class Notifier {
-    private var authorized: Bool?
-    private var useAppleScript: Bool
-
-    init() {
-        useAppleScript = Bundle.main.bundleIdentifier == nil || !Bundle.main.bundlePath.hasSuffix(".app")
+    enum Permission: Equatable {
+        /// 还没问过 / 还没查到
+        case unknown
+        case allowed
+        /// 系统设置里关掉了
+        case denied
+        /// 开发运行（不在 App 包里），走 osascript
+        case devBuild
     }
 
+    private(set) var permission: Permission
+    /// 权限变化时回调（PanelModel 据此显示「通知未开启」）
+    var onChange: ((Permission) -> Void)?
     private let presenter = ForegroundPresenter()
 
+    init() {
+        permission = AppUpdater.bundleURL == nil ? .devBuild : .unknown
+    }
+
+    /// 启动时调用：没问过就向系统申请（系统弹授权提示），问过就只读当前状态
     func requestAuthorization() {
-        guard !useAppleScript else { return }
+        guard permission != .devBuild else { return }
         UNUserNotificationCenter.current().delegate = presenter
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+        UNUserNotificationCenter.current().getNotificationSettings { s in
+            let status = s.authorizationStatus
             Task { @MainActor in
-                self.authorized = granted && error == nil
-                if !granted || error != nil { self.useAppleScript = true }
+                if status == .notDetermined {
+                    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
+                        Task { @MainActor in self.refresh() }
+                    }
+                } else {
+                    self.apply(status)
+                }
             }
         }
     }
 
-    func post(_ n: Notices.Notice, id: String = UUID().uuidString) {
-        if useAppleScript || authorized == false { return Self.appleScript(n) }
-        let content = UNMutableNotificationContent()
-        content.title = n.title
-        content.body = n.body
-        let req = UNNotificationRequest(identifier: id, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(req) { error in
-            if error != nil { Task { @MainActor in Self.appleScript(n) } }
+    /// 重新读系统里的权限（用户可能刚在系统设置里改过）：打开面板时调用
+    func refresh() {
+        guard permission != .devBuild else { return }
+        UNUserNotificationCenter.current().getNotificationSettings { s in
+            let status = s.authorizationStatus
+            Task { @MainActor in self.apply(status) }
         }
     }
 
-    static func appleScript(_ n: Notices.Notice) {
+    private func apply(_ status: UNAuthorizationStatus) {
+        let p: Permission
+        switch status {
+        case .authorized, .provisional, .ephemeral: p = .allowed
+        case .denied: p = .denied
+        default: p = .unknown
+        }
+        guard p != permission else { return }
+        permission = p
+        onChange?(p)
+    }
+
+    func post(_ n: Notices.Notice, id: String = UUID().uuidString) {
+        switch permission {
+        case .devBuild: Self.appleScript(n)
+        case .denied: return
+        case .allowed, .unknown:
+            let content = UNMutableNotificationContent()
+            content.title = n.title
+            content.body = n.body
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
+        }
+    }
+
+    /// 打开「系统设置 → 通知 → cswap」
+    static func openSystemSettings() {
+        let id = Bundle.main.bundleIdentifier ?? Preferences.domain
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private static func appleScript(_ n: Notices.Notice) {
         func esc(_ s: String) -> String { s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
         let p = Process()
         p.executableURL = URL(filePath: "/usr/bin/osascript")

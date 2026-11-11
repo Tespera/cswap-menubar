@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-cswap：claude-swap 命令行的 macOS 菜单栏 App（原生 Swift）。先读 `README.md`，再按需读 `docs/`。实现以 `design-demos/a4.html` 和 `docs/03-界面与设计规范.md` 为准；被否的方案见 `docs/07-决策记录.md`，不要重提。
+cswap：claude-swap 命令行的 macOS 菜单栏 App（原生 Swift）。先读 `docs/08-开发指南.md`（README 是给用户看的），再按需读 `docs/`。实现以 `design-demos/a4.html` 和 `docs/03-界面与设计规范.md` 为准；被否的方案见 `docs/07-决策记录.md`，不要重提。
 
 ## 边界（最重要）
 
